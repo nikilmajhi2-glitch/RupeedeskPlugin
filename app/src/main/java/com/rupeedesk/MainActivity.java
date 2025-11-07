@@ -1,4 +1,4 @@
-package com.rupeedesk.smsaautosender;
+package com.rupeedesk
 
 import android.Manifest;
 import android.app.PendingIntent;
@@ -99,7 +99,7 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(this, "✅ Bound to User: " + userId, Toast.LENGTH_SHORT).show();
                         showTaskControls(true);
                     } else {
-                        Toast.makeText(this, "⚠️ User ID not found in Firestore", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "⚠️ User ID not found ", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "❌ Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
