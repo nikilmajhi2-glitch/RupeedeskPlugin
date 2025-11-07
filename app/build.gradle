@@ -4,7 +4,7 @@ apply plugin: 'com.google.gms.google-services'
 
 android {
 // ✅ Must match your Java package and manifest folder
-namespace "com.rupeedesk.smsaautosender"
+namespace "com.rupeedesk"
 compileSdkVersion 34 // 🆙 Android 15 support
 
 defaultConfig {
