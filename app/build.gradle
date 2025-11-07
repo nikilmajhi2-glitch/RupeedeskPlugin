@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.google.gms.google-services'
 
 android {
-namespace "com.rupeedesk.smsaautosender"
+namespace "com.rupeedesk"
 compileSdkVersion 34 // 🆙 Updated for Android 15 support
 
 defaultConfig {
