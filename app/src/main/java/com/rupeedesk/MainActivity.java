@@ -1,4 +1,4 @@
-package com.rupeedesk.smsaautosender;
+package com.rupeedesk;
 
 import android.Manifest;
 import android.app.AlertDialog;
