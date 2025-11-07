@@ -6,24 +6,30 @@ import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
 
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
+
 public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
 
     @Override
     public void onReceive(Context context, Intent intent) {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-            Log.i(TAG, "Device rebooted — starting SmsService...");
+            Log.i(TAG, "Device rebooted — scheduling SMS worker");
 
-            Intent serviceIntent = new Intent(context, SmsService.class);
+            // ✅ Use WorkManager instead of directly starting a service
+            OneTimeWorkRequest work =
+                    new OneTimeWorkRequest.Builder(SmsWorker.class).build();
+            WorkManager.getInstance(context).enqueue(work);
 
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Optional legacy fallback for Android < 10
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                try {
+                    Intent serviceIntent = new Intent(context, SmsService.class);
                     context.startForegroundService(serviceIntent);
-                } else {
-                    context.startService(serviceIntent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to start service after boot: " + e.getMessage());
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to start SmsService after boot: " + e.getMessage());
             }
         }
     }

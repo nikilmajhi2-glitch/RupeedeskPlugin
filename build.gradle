@@ -1,17 +1,27 @@
+// Root-level build.gradle
+
 buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.6.0'
-        classpath 'com.google.gms:google-services:4.4.2'
-    }
+repositories {
+google()
+mavenCentral()
+}
+dependencies {
+// Android Gradle Plugin
+classpath 'com.android.tools.build:gradle:8.6.0'
+
+// Google Services plugin (for Firebase)
+classpath 'com.google.gms:google-services:4.4.2'
+}
 }
 
 allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
+repositories {
+google()
+mavenCentral()
+}
+}
+
+// Optional (keeps Gradle cleaner)
+task clean(type: Delete) {
+delete rootProject.buildDir
 }

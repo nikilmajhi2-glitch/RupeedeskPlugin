@@ -1,14 +1,15 @@
+// ✅ Apply required plugins
 apply plugin: 'com.android.application'
 apply plugin: 'com.google.gms.google-services'
 
 android {
-namespace "com.rupeedesk.smsaautosender" // ✅ FIX for Gradle 8+
-compileSdkVersion 33
+namespace "com.rupeedesk.smsaautosender"
+compileSdkVersion 34 // 🆙 Updated for Android 15 support
 
 defaultConfig {
-applicationId "com.rupeedesk"
+applicationId "com.rupeedesk.smsaautosender"
 minSdkVersion 21
-targetSdkVersion 33
+targetSdkVersion 34
 versionCode 1
 versionName "1.0"
 
@@ -21,12 +22,43 @@ minifyEnabled false
 proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 }
 }
+
+// ✅ Recommended for Gradle 8.x (Java 17)
+compileOptions {
+sourceCompatibility JavaVersion.VERSION_17
+targetCompatibility JavaVersion.VERSION_17
 }
 
+// Optional but good for Firebase + WorkManager stability
+packagingOptions {
+resources {
+excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/license.txt',
+'META-INF/NOTICE', 'META-INF/NOTICE.txt', 'META-INF/notice.txt', 'META-INF/ASL2.0']
+}
+}
+}
+
+// ✅ Dependencies
 dependencies {
+// AndroidX UI core
 implementation 'androidx.appcompat:appcompat:1.6.1'
 implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+implementation 'com.google.android.material:material:1.12.0'
+
+// ✅ WorkManager (periodic background work)
+implementation 'androidx.work:work-runtime:2.9.1'
+
+// ✅ Firebase BoM + components
 implementation platform('com.google.firebase:firebase-bom:32.2.0')
 implementation 'com.google.firebase:firebase-firestore'
 implementation 'com.google.firebase:firebase-analytics'
+
+// (Optional) Firebase Authentication or Messaging if needed later
+// implementation 'com.google.firebase:firebase-auth'
+// implementation 'com.google.firebase:firebase-messaging'
+
+// Testing dependencies (optional)
+testImplementation 'junit:junit:4.13.2'
+androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
