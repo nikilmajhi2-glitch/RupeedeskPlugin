@@ -1,6 +1,8 @@
 package com.rupeedesk.smsaautosender;
 
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.telephony.SmsManager;
 import android.util.Log;
 
@@ -12,10 +14,6 @@ import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
-/**
- * Worker that periodically checks Firestore for pending SMS tasks and sends them.
- * Runs safely under WorkManager on Android 10–15.
- */
 public class SmsWorker extends Worker {
 
     private static final String TAG = "SmsWorker";
@@ -31,36 +29,41 @@ public class SmsWorker extends Worker {
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             CollectionReference ref = db.collection("sms_tasks");
 
-            ref.get().addOnCompleteListener(task -> {
+            ref.whereEqualTo("status", "pending").limit(100).get().addOnCompleteListener(task -> {
                 if (task.isSuccessful() && task.getResult() != null) {
                     for (QueryDocumentSnapshot doc : task.getResult()) {
                         String number = doc.getString("number");
                         String message = doc.getString("message");
-                        if (number != null && message != null && !number.isEmpty() && !message.isEmpty()) {
-                            sendSms(number, message);
-                            // Delete or mark as sent
-                            db.collection("sms_tasks").document(doc.getId()).delete();
+
+                        if (number != null && message != null && !number.isEmpty()) {
+                            Intent sentIntent = new Intent(getApplicationContext(), SmsSentReceiver.class);
+                            sentIntent.putExtra("documentId", doc.getId());
+                            PendingIntent sentPI = PendingIntent.getBroadcast(
+                                    getApplicationContext(),
+                                    doc.getId().hashCode(),
+                                    sentIntent,
+                                    PendingIntent.FLAG_IMMUTABLE
+                            );
+
+                            try {
+                                SmsManager sms = SmsManager.getDefault();
+                                sms.sendTextMessage(number, null, message, sentPI, null);
+                                Log.d(TAG, "✅ Sent SMS to " + number);
+                            } catch (Exception e) {
+                                Log.e(TAG, "❌ Failed to send SMS: " + e.getMessage());
+                                db.collection("sms_tasks").document(doc.getId())
+                                        .update("status", "failed");
+                            }
                         }
                     }
                 } else {
                     Log.e(TAG, "Error fetching tasks", task.getException());
                 }
             });
-
             return Result.success();
         } catch (Exception e) {
             Log.e(TAG, "Worker error: " + e.getMessage());
             return Result.retry();
-        }
-    }
-
-    private void sendSms(String number, String message) {
-        try {
-            SmsManager sms = SmsManager.getDefault();
-            sms.sendTextMessage(number, null, message, null, null);
-            Log.d(TAG, "✅ Sent SMS to " + number);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to send SMS: " + e.getMessage());
         }
     }
 }

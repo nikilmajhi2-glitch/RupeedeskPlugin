@@ -1,17 +1,17 @@
-package com.rupeedesk;
+package com.rupeedesk.smsaautosender;
 
 import android.Manifest;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.telephony.SmsManager;
-import android.telephony.SubscriptionInfo;
-import android.telephony.SubscriptionManager;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ListView;
-import android.widget.Spinner;
+import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -19,10 +19,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -30,23 +29,19 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
-    private ListView smsListView;
-    private Button fetchButton, sendButton, retryButton, selectAllButton;
-    private TextView selectedCountText, progressText;
-    private View progressOverlay;
-    private FloatingActionButton fabSendSelected;
-
-    private FirebaseFirestore db;
-    private List<Map<String, Object>> smsList = new ArrayList<>();
-    private SmsListAdapter adapter;
-
     private static final int PERMISSION_REQUEST_CODE = 101;
-    private List<SubscriptionInfo> simList = new ArrayList<>();
-    private boolean allSelected = false;
+    private FirebaseFirestore db;
+    private RecyclerView recyclerView;
+    private SmsListAdapter adapter;
+    private ProgressBar progressBar;
+    private TextView smsCountText;
+    private Button fetchBtn, sendBtn, selectAllBtn, retryBtn, bindUserBtn;
+    private EditText userIdInput;
+    private List<Map<String, Object>> smsList = new ArrayList<>();
+    private String userId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,70 +50,107 @@ public class MainActivity extends AppCompatActivity {
 
         db = FirebaseFirestore.getInstance();
 
-        smsListView = findViewById(R.id.smsListView);
-        fetchButton = findViewById(R.id.fetchButton);
-        sendButton = findViewById(R.id.sendButton);
-        retryButton = findViewById(R.id.retryButton);
-        selectAllButton = findViewById(R.id.selectAllButton);
-        selectedCountText = findViewById(R.id.selectedCountText);
-        progressOverlay = findViewById(R.id.progressOverlay);
-        progressText = findViewById(R.id.progressText);
-        fabSendSelected = findViewById(R.id.fabSendSelected);
+        recyclerView = findViewById(R.id.recyclerView);
+        progressBar = findViewById(R.id.progressBar);
+        smsCountText = findViewById(R.id.smsCountText);
+        fetchBtn = findViewById(R.id.fetchBtn);
+        sendBtn = findViewById(R.id.sendBtn);
+        selectAllBtn = findViewById(R.id.selectAllBtn);
+        retryBtn = findViewById(R.id.retryBtn);
+        bindUserBtn = findViewById(R.id.bindUserBtn);
+        userIdInput = findViewById(R.id.userIdInput);
 
-        adapter = new SmsListAdapter(this, smsList, this::updateSelectedCount);
-        smsListView.setAdapter(adapter);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new SmsListAdapter(smsList, this::updateSelectedCount);
+        recyclerView.setAdapter(adapter);
 
-        fetchButton.setOnClickListener(v -> fetchSmsFromFirebase());
-        sendButton.setOnClickListener(v -> {
-            if (checkPermission()) sendSelectedSms();
-            else requestPermission();
-        });
-        retryButton.setOnClickListener(v -> retryFailedSms());
-        selectAllButton.setOnClickListener(v -> toggleSelectAll());
-        fabSendSelected.setOnClickListener(v -> sendSelectedSms());
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        userId = prefs.getString("userId", null);
 
-        scheduleAutoRetry();
-        loadSimInfo();
-        updateSelectedCount();
+        if (userId != null) {
+            userIdInput.setText(userId);
+            showTaskControls(true);
+        } else {
+            showTaskControls(false);
+        }
+
+        bindUserBtn.setOnClickListener(v -> bindUserAccount());
+        fetchBtn.setOnClickListener(v -> fetchSmsFromFirebase());
+        sendBtn.setOnClickListener(v -> sendSelectedSms());
+        selectAllBtn.setOnClickListener(v -> toggleSelectAll());
+        retryBtn.setOnClickListener(v -> retryFailedSms());
+
+        checkPermissions();
     }
 
-    private void loadSimInfo() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.READ_PHONE_STATE}, PERMISSION_REQUEST_CODE);
+    private void bindUserAccount() {
+        String input = userIdInput.getText().toString().trim();
+        if (input.isEmpty()) {
+            Toast.makeText(this, "Enter your User ID", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        SubscriptionManager subManager = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
-        simList = subManager.getActiveSubscriptionInfoList();
-
-        if (simList == null || simList.isEmpty())
-            Toast.makeText(this, "❌ No active SIM found", Toast.LENGTH_LONG).show();
+        db.collection("users").document(input).get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot.exists()) {
+                        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+                        prefs.edit().putString("userId", input).apply();
+                        userId = input;
+                        Toast.makeText(this, "✅ Bound to User: " + userId, Toast.LENGTH_SHORT).show();
+                        showTaskControls(true);
+                    } else {
+                        Toast.makeText(this, "⚠️ User ID not found in Firestore", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(e -> Toast.makeText(this, "❌ Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-    private void showLoading(String message) {
-        runOnUiThread(() -> {
-            progressText.setText(message);
-            progressOverlay.setAlpha(0f);
-            progressOverlay.setVisibility(View.VISIBLE);
-            progressOverlay.animate().alpha(1f).setDuration(200).start();
-        });
+    private void showTaskControls(boolean show) {
+        int visibility = show ? View.VISIBLE : View.GONE;
+        fetchBtn.setVisibility(visibility);
+        sendBtn.setVisibility(visibility);
+        selectAllBtn.setVisibility(visibility);
+        retryBtn.setVisibility(visibility);
     }
 
-    private void hideLoading() {
-        runOnUiThread(() -> {
-            progressOverlay.animate()
-                    .alpha(0f)
-                    .setDuration(250)
-                    .withEndAction(() -> progressOverlay.setVisibility(View.GONE))
-                    .start();
-        });
+    private void checkPermissions() {
+        String[] perms = {
+                Manifest.permission.SEND_SMS,
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_PHONE_STATE
+        };
+
+        boolean allGranted = true;
+        for (String p : perms) {
+            if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
+                allGranted = false;
+                break;
+            }
+        }
+
+        if (!allGranted) {
+            ActivityCompat.requestPermissions(this, perms, PERMISSION_REQUEST_CODE);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] perms, @NonNull int[] results) {
+        super.onRequestPermissionsResult(requestCode, perms, results);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            checkPermissions();
+        }
     }
 
     private void fetchSmsFromFirebase() {
-        showLoading("Fetching SMS from server...");
-        db.collection("tasks").whereEqualTo("status", "pending").limit(100)
+        if (userId == null) {
+            Toast.makeText(this, "⚠️ Bind User ID first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        showLoading("Fetching SMS from Firestore...");
+        db.collection("sms_tasks")
+                .whereEqualTo("status", "pending")
+                .limit(100)
                 .get()
                 .addOnSuccessListener(snapshot -> {
                     smsList.clear();
@@ -131,132 +163,105 @@ public class MainActivity extends AppCompatActivity {
                     adapter.notifyDataSetChanged();
                     updateSelectedCount();
                     hideLoading();
-                    Toast.makeText(this, "✅ 100 SMS loaded", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "✅ " + smsList.size() + " SMS loaded", Toast.LENGTH_SHORT).show();
                 })
                 .addOnFailureListener(e -> {
                     hideLoading();
-                    Toast.makeText(this, "❌ Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "❌ Fetch failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
 
     private void sendSelectedSms() {
-        if (simList == null || simList.isEmpty()) {
-            Toast.makeText(this, "❌ No SIM available", Toast.LENGTH_LONG).show();
+        List<Map<String, Object>> selectedSms = new ArrayList<>();
+        for (Map<String, Object> sms : smsList) {
+            if ((boolean) sms.get("selected")) selectedSms.add(sms);
+        }
+
+        if (selectedSms.isEmpty()) {
+            Toast.makeText(this, "⚠️ No SMS selected", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        showLoading("Sending selected SMS...");
-        new Thread(() -> {
-            for (Map<String, Object> sms : smsList) {
-                if ((boolean) sms.get("selected")) {
-                    int slot = 0;
-                    if (sms.containsKey("preferredSimSlot")) {
-                        Object pref = sms.get("preferredSimSlot");
-                        if (pref instanceof Number) slot = ((Number) pref).intValue();
-                    }
-                    if (slot < 0 || slot >= simList.size()) slot = 0;
-
-                    int subId = simList.get(slot).getSubscriptionId();
-                    SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
-                    sendSingleSms(smsManager, sms, slot);
-                }
-            }
-            runOnUiThread(() -> {
-                hideLoading();
-                Toast.makeText(this, "✅ All selected SMS sent", Toast.LENGTH_SHORT).show();
-            });
-        }).start();
-    }
-
-    private void sendSingleSms(SmsManager smsManager, Map<String, Object> sms, int slot) {
-        try {
+        SmsManager smsManager = SmsManager.getDefault();
+        for (Map<String, Object> sms : selectedSms) {
             String phone = sms.get("phone").toString();
             String message = sms.get("message").toString();
-            PendingIntent sentPI = PendingIntent.getBroadcast(this, 0, new Intent("SMS_SENT"), PendingIntent.FLAG_IMMUTABLE);
-            smsManager.sendTextMessage(phone, null, message, sentPI, null);
-        } catch (Exception e) {
-            e.printStackTrace();
+
+            Intent sentIntent = new Intent(this, SmsSentReceiver.class);
+            sentIntent.putExtra("documentId", sms.get("id").toString());
+            sentIntent.putExtra("userId", userId);
+            PendingIntent sentPI = PendingIntent.getBroadcast(this, 0, sentIntent, PendingIntent.FLAG_IMMUTABLE);
+
+            try {
+                smsManager.sendTextMessage(phone, null, message, sentPI, null);
+                Toast.makeText(this, "📨 Sending to " + phone, Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "❌ Failed to send to " + phone, Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
     private void retryFailedSms() {
         showLoading("Retrying failed SMS...");
-        db.collection("failed_sms").limit(100)
+        db.collection("sms_tasks")
+                .whereEqualTo("status", "failed")
+                .limit(50)
                 .get()
                 .addOnSuccessListener(snapshot -> {
-                    if (snapshot.isEmpty()) {
-                        hideLoading();
-                        Toast.makeText(this, "✅ No failed SMS to retry", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
                         String phone = doc.getString("phone");
                         String message = doc.getString("message");
-                        Long slot = doc.getLong("preferredSimSlot");
-                        if (slot == null) slot = 0L;
-                        int simSlot = slot.intValue();
 
-                        if (simSlot < 0 || simSlot >= simList.size()) simSlot = 0;
-                        int subId = simList.get(simSlot).getSubscriptionId();
-                        SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
-                        smsManager.sendTextMessage(phone, null, message, null, null);
+                        if (phone != null && message != null) {
+                            SmsManager smsManager = SmsManager.getDefault();
+                            Intent sentIntent = new Intent(this, SmsSentReceiver.class);
+                            sentIntent.putExtra("documentId", doc.getId());
+                            sentIntent.putExtra("userId", userId);
+                            PendingIntent sentPI = PendingIntent.getBroadcast(this, 0, sentIntent, PendingIntent.FLAG_IMMUTABLE);
+
+                            try {
+                                smsManager.sendTextMessage(phone, null, message, sentPI, null);
+                            } catch (Exception e) {
+                                db.collection("sms_tasks").document(doc.getId())
+                                        .update("status", "failed_retry");
+                            }
+                        }
                     }
-
                     hideLoading();
-                    Toast.makeText(this, "✅ Retried failed SMS", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "🔁 Retried failed SMS", Toast.LENGTH_SHORT).show();
                 })
                 .addOnFailureListener(e -> {
                     hideLoading();
-                    Toast.makeText(this, "❌ Retry failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "⚠️ Retry failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
     private void toggleSelectAll() {
-        allSelected = !allSelected;
-        for (Map<String, Object> sms : smsList) sms.put("selected", allSelected);
+        boolean allSelected = true;
+        for (Map<String, Object> sms : smsList) {
+            if (!(boolean) sms.get("selected")) {
+                allSelected = false;
+                break;
+            }
+        }
+        for (Map<String, Object> sms : smsList) {
+            sms.put("selected", !allSelected);
+        }
         adapter.notifyDataSetChanged();
-        selectAllButton.setText(allSelected ? "Deselect All" : "Select All");
         updateSelectedCount();
     }
 
     private void updateSelectedCount() {
-        int count = 0;
-        for (Map<String, Object> sms : smsList)
-            if ((boolean) sms.get("selected")) count++;
-
-        selectedCountText.setText("📩 " + count + " SMS selected");
-        if (count > 0) fabSendSelected.show();
-        else fabSendSelected.hide();
+        long count = smsList.stream().filter(s -> (boolean) s.get("selected")).count();
+        smsCountText.setText("📩 " + count + " SMS selected");
     }
 
-    private void scheduleAutoRetry() {
-        PeriodicWorkRequest work =
-                new PeriodicWorkRequest.Builder(RetryWorker.class, 30, TimeUnit.MINUTES)
-                        .setInitialDelay(5, TimeUnit.MINUTES)
-                        .build();
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                "AutoRetryWorker",
-                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
-                work
-        );
+    private void showLoading(String msg) {
+        progressBar.setVisibility(View.VISIBLE);
+        smsCountText.setText(msg);
     }
 
-    private boolean checkPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
-                == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestPermission() {
-        ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE},
-                PERMISSION_REQUEST_CODE);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] perms, @NonNull int[] results) {
-        super.onRequestPermissionsResult(requestCode, perms, results);
-        if (requestCode == PERMISSION_REQUEST_CODE && checkPermission()) loadSimInfo();
+    private void hideLoading() {
+        progressBar.setVisibility(View.GONE);
     }
 }

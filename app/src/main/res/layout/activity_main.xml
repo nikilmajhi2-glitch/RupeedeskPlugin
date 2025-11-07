@@ -1,121 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:gravity="center"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
-    android:background="#FAFAFA">
+    android:padding="24dp">
 
-    <!-- Hidden SIM Selector (future use) -->
-    <Spinner
-        android:id="@+id/simSelector"
+    <!-- 🔑 Bind User ID -->
+    <EditText
+        android:id="@+id/userIdInput"
+        android:hint="Enter your User ID"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:visibility="gone" />
+        android:inputType="text"
+        android:padding="12dp" />
 
-    <!-- Fetch Button -->
     <Button
-        android:id="@+id/fetchButton"
+        android:id="@+id/bindUserBtn"
+        android:text="Bind Account"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" />
+
+    <!-- 🔄 Task controls -->
+    <Button
+        android:id="@+id/fetchBtn"
         android:text="Fetch SMS Tasks"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/simSelector"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="20dp"
+        android:visibility="gone" />
 
-    <!-- Send Selected -->
     <Button
-        android:id="@+id/sendButton"
+        android:id="@+id/sendBtn"
         android:text="Send Selected SMS"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/fetchButton"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="12dp"
+        android:visibility="gone" />
 
-    <!-- Retry Failed -->
     <Button
-        android:id="@+id/retryButton"
+        android:id="@+id/selectAllBtn"
+        android:text="Select / Deselect All"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/retryBtn"
         android:text="Retry Failed SMS"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/sendButton"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="12dp"
+        android:visibility="gone" />
 
-    <!-- Select All / Deselect All -->
-    <Button
-        android:id="@+id/selectAllButton"
-        android:text="Select All"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/retryButton"
-        android:layout_marginTop="8dp" />
-
-    <!-- Selected Counter -->
     <TextView
-        android:id="@+id/selectedCountText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="📩 0 SMS selected"
-        android:textStyle="bold"
-        android:textSize="16sp"
-        android:textColor="#333333"
-        android:gravity="center_horizontal"
-        android:layout_below="@id/selectAllButton"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp" />
-
-    <!-- List of SMS -->
-    <ListView
-        android:id="@+id/smsListView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_below="@id/selectedCountText"
-        android:layout_above="@id/fabSendSelected"
-        android:dividerHeight="1dp"
-        android:divider="#E0E0E0" />
-
-    <!-- Floating Send Button -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabSendSelected"
+        android:id="@+id/smsCountText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"
-        android:layout_margin="24dp"
-        android:visibility="gone"
-        app:srcCompat="@drawable/ic_send"
-        app:tint="#FFFFFF"
-        app:backgroundTint="#4CAF50" />
+        android:text="📩 0 SMS loaded"
+        android:layout_marginTop="20dp"
+        android:textSize="16sp" />
 
-    <!-- 🔄 Loading Overlay -->
-    <FrameLayout
-        android:id="@+id/progressOverlay"
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:visibility="gone"
+        android:layout_marginTop="12dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#AA000000"
-        android:visibility="gone"
-        android:clickable="true"
-        android:focusable="true"
-        android:alpha="0">
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_gravity="center"
-            android:indeterminate="true"
-            android:indeterminateTint="#FFFFFF" />
-
-        <TextView
-            android:id="@+id/progressText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center|bottom"
-            android:layout_marginBottom="180dp"
-            android:text="Please wait..."
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-    </FrameLayout>
-
-</RelativeLayout>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp" />
+</LinearLayout>
