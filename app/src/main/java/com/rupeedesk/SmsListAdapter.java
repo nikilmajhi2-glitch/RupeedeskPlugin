@@ -1,70 +1,74 @@
-package com.rupeedesk;
+package com.rupeedesk.smsaautosender;
 
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.CheckBox;
 import android.widget.TextView;
-
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 import java.util.Map;
 
-public class SmsListAdapter extends BaseAdapter {
-
-    public interface OnSelectionChangedListener {
-        void onSelectionChanged();
-    }
+public class SmsListAdapter extends RecyclerView.Adapter<SmsListAdapter.ViewHolder> {
 
     private final Context context;
     private final List<Map<String, Object>> smsList;
     private final OnSelectionChangedListener listener;
 
-    public SmsListAdapter(Context context, List<Map<String, Object>> smsList,
-                          OnSelectionChangedListener listener) {
+    public interface OnSelectionChangedListener {
+        void onSelectionChanged();
+    }
+
+    public SmsListAdapter(Context context, List<Map<String, Object>> smsList, OnSelectionChangedListener listener) {
         this.context = context;
         this.smsList = smsList;
         this.listener = listener;
     }
 
+    @NonNull
     @Override
-    public int getCount() { return smsList.size(); }
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(context).inflate(R.layout.item_sms, parent, false);
+        return new ViewHolder(view);
+    }
 
     @Override
-    public Object getItem(int position) { return smsList.get(position); }
-
-    @Override
-    public long getItemId(int position) { return position; }
-
-    @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Map<String, Object> sms = smsList.get(position);
+        String phone = (String) sms.get("phone");
+        String message = (String) sms.get("message");
+        boolean selected = (boolean) sms.get("selected");
 
-        if (convertView == null)
-            convertView = LayoutInflater.from(context).inflate(R.layout.item_sms, parent, false);
+        holder.phoneText.setText(phone);
+        holder.messageText.setText(message);
+        holder.checkBox.setChecked(selected);
 
-        TextView phoneText = convertView.findViewById(R.id.phoneText);
-        TextView messageText = convertView.findViewById(R.id.messageText);
-        CheckBox checkBox = convertView.findViewById(R.id.smsCheckbox);
-        View rowLayout = convertView.findViewById(R.id.smsRowLayout);
+        View.OnClickListener toggle = v -> {
+            sms.put("selected", !selected);
+            notifyItemChanged(position);
+            listener.onSelectionChanged();
+        };
 
-        phoneText.setText(sms.get("phone").toString());
-        messageText.setText(sms.get("message").toString());
-        checkBox.setChecked((boolean) sms.get("selected"));
+        holder.itemView.setOnClickListener(toggle);
+        holder.checkBox.setOnClickListener(toggle);
+    }
 
-        checkBox.setOnCheckedChangeListener((btn, isChecked) -> {
-            sms.put("selected", isChecked);
-            if (listener != null) listener.onSelectionChanged();
-        });
+    @Override
+    public int getItemCount() {
+        return smsList.size();
+    }
 
-        rowLayout.setOnClickListener(v -> {
-            boolean newState = !(boolean) sms.get("selected");
-            sms.put("selected", newState);
-            checkBox.setChecked(newState);
-            if (listener != null) listener.onSelectionChanged();
-        });
+    public static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView phoneText, messageText;
+        CheckBox checkBox;
 
-        return convertView;
+        public ViewHolder(@NonNull View itemView) {
+            super(itemView);
+            phoneText = itemView.findViewById(R.id.smsPhone);
+            messageText = itemView.findViewById(R.id.smsMessage);
+            checkBox = itemView.findViewById(R.id.smsCheckBox);
+        }
     }
 }

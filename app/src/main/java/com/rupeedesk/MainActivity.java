@@ -1,5 +1,6 @@
 package com.rupeedesk;
 
+import com.rupeedesk.smsaautosender.SmsSentReceiver;
 import android.Manifest;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -61,12 +62,11 @@ public class MainActivity extends AppCompatActivity {
         userIdInput = findViewById(R.id.userIdInput);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new SmsListAdapter(smsList, this::updateSelectedCount);
-        recyclerView.setAdapter(adapter);
+        adapter = new SmsListAdapter(this, smsList, this::updateSelectedCount);
+recyclerView.setAdapter(adapter);
 
         SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
         userId = prefs.getString("userId", null);
-
         if (userId != null) {
             userIdInput.setText(userId);
             showTaskControls(true);
