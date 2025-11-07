@@ -9,7 +9,7 @@ compileSdkVersion 34 // 🆙 Android 15 support
 
 defaultConfig {
 // ✅ Must match your Firebase package name
-applicationId "com.rupeedesk.smsaautosender"
+applicationId "com.rupeedesk"
 minSdkVersion 21
 targetSdkVersion 34
 versionCode 1
