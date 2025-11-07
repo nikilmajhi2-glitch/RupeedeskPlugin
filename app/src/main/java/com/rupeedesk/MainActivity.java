@@ -1,4 +1,4 @@
-package com.rupeedesk
+package com.rupeedesk;
 
 import android.Manifest;
 import android.app.PendingIntent;
