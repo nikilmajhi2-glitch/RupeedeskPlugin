@@ -1,5 +1,5 @@
 package com.rupeedesk;
-
+import com.rupeedesk.smsaautosender.SmsService;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.role.RoleManager;
