@@ -1,10 +1,7 @@
 package com.rupeedesk;
 
-import com.rupeedesk.smsaautosender.SmsSentReceiver;
 import android.Manifest;
 import android.app.PendingIntent;
-import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -25,15 +22,23 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.rupeedesk.smsaautosender.SmsSentReceiver;
+import com.rupeedesk.smsaautosender.FirebaseManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Main Activity for user binding, fetching SMS tasks, and sending.
+ * Belongs to package com.rupeedesk.
+ * Works with subpackage com.rupeedesk.smsaautosender.*
+ */
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 101;
+
     private FirebaseFirestore db;
     private RecyclerView recyclerView;
     private SmsListAdapter adapter;
@@ -41,7 +46,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView smsCountText;
     private Button fetchBtn, sendBtn, selectAllBtn, retryBtn, bindUserBtn;
     private EditText userIdInput;
-    private List<Map<String, Object>> smsList = new ArrayList<>();
+
+    private final List<Map<String, Object>> smsList = new ArrayList<>();
     private String userId;
 
     @Override
@@ -51,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
 
         db = FirebaseFirestore.getInstance();
 
+        // 🔧 UI setup
         recyclerView = findViewById(R.id.recyclerView);
         progressBar = findViewById(R.id.progressBar);
         smsCountText = findViewById(R.id.smsCountText);
@@ -63,10 +70,12 @@ public class MainActivity extends AppCompatActivity {
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new SmsListAdapter(this, smsList, this::updateSelectedCount);
-recyclerView.setAdapter(adapter);
+        recyclerView.setAdapter(adapter);
 
+        // Load saved user ID
         SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
         userId = prefs.getString("userId", null);
+
         if (userId != null) {
             userIdInput.setText(userId);
             showTaskControls(true);
@@ -74,6 +83,7 @@ recyclerView.setAdapter(adapter);
             showTaskControls(false);
         }
 
+        // Buttons
         bindUserBtn.setOnClickListener(v -> bindUserAccount());
         fetchBtn.setOnClickListener(v -> fetchSmsFromFirebase());
         sendBtn.setOnClickListener(v -> sendSelectedSms());
@@ -83,6 +93,7 @@ recyclerView.setAdapter(adapter);
         checkPermissions();
     }
 
+    // 🔹 Bind user ID before fetching tasks
     private void bindUserAccount() {
         String input = userIdInput.getText().toString().trim();
         if (input.isEmpty()) {
@@ -93,26 +104,28 @@ recyclerView.setAdapter(adapter);
         db.collection("users").document(input).get()
                 .addOnSuccessListener(snapshot -> {
                     if (snapshot.exists()) {
-                        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
-                        prefs.edit().putString("userId", input).apply();
+                        getSharedPreferences("AppPrefs", MODE_PRIVATE)
+                                .edit().putString("userId", input).apply();
                         userId = input;
                         Toast.makeText(this, "✅ Bound to User: " + userId, Toast.LENGTH_SHORT).show();
                         showTaskControls(true);
                     } else {
-                        Toast.makeText(this, "⚠️ User ID not found ", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "⚠️ User ID not found", Toast.LENGTH_SHORT).show();
                     }
                 })
-                .addOnFailureListener(e -> Toast.makeText(this, "❌ Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "❌ Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
     private void showTaskControls(boolean show) {
-        int visibility = show ? View.VISIBLE : View.GONE;
-        fetchBtn.setVisibility(visibility);
-        sendBtn.setVisibility(visibility);
-        selectAllBtn.setVisibility(visibility);
-        retryBtn.setVisibility(visibility);
+        int v = show ? View.VISIBLE : View.GONE;
+        fetchBtn.setVisibility(v);
+        sendBtn.setVisibility(v);
+        selectAllBtn.setVisibility(v);
+        retryBtn.setVisibility(v);
     }
 
+    // 🔹 Permissions
     private void checkPermissions() {
         String[] perms = {
                 Manifest.permission.SEND_SMS,
@@ -136,11 +149,10 @@ recyclerView.setAdapter(adapter);
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] perms, @NonNull int[] results) {
         super.onRequestPermissionsResult(requestCode, perms, results);
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            checkPermissions();
-        }
+        if (requestCode == PERMISSION_REQUEST_CODE) checkPermissions();
     }
 
+    // 🔹 Fetch SMS tasks
     private void fetchSmsFromFirebase() {
         if (userId == null) {
             Toast.makeText(this, "⚠️ Bind User ID first", Toast.LENGTH_SHORT).show();
@@ -171,19 +183,19 @@ recyclerView.setAdapter(adapter);
                 });
     }
 
+    // 🔹 Send selected SMS
     private void sendSelectedSms() {
-        List<Map<String, Object>> selectedSms = new ArrayList<>();
-        for (Map<String, Object> sms : smsList) {
-            if ((boolean) sms.get("selected")) selectedSms.add(sms);
-        }
+        List<Map<String, Object>> selected = new ArrayList<>();
+        for (Map<String, Object> sms : smsList)
+            if ((boolean) sms.get("selected")) selected.add(sms);
 
-        if (selectedSms.isEmpty()) {
+        if (selected.isEmpty()) {
             Toast.makeText(this, "⚠️ No SMS selected", Toast.LENGTH_SHORT).show();
             return;
         }
 
         SmsManager smsManager = SmsManager.getDefault();
-        for (Map<String, Object> sms : selectedSms) {
+        for (Map<String, Object> sms : selected) {
             String phone = sms.get("phone").toString();
             String message = sms.get("message").toString();
 
@@ -201,6 +213,7 @@ recyclerView.setAdapter(adapter);
         }
     }
 
+    // 🔹 Retry failed SMS
     private void retryFailedSms() {
         showLoading("Retrying failed SMS...");
         db.collection("sms_tasks")
@@ -218,12 +231,10 @@ recyclerView.setAdapter(adapter);
                             sentIntent.putExtra("documentId", doc.getId());
                             sentIntent.putExtra("userId", userId);
                             PendingIntent sentPI = PendingIntent.getBroadcast(this, 0, sentIntent, PendingIntent.FLAG_IMMUTABLE);
-
                             try {
                                 smsManager.sendTextMessage(phone, null, message, sentPI, null);
                             } catch (Exception e) {
-                                db.collection("sms_tasks").document(doc.getId())
-                                        .update("status", "failed_retry");
+                                db.collection("sms_tasks").document(doc.getId()).update("status", "failed_retry");
                             }
                         }
                     }
@@ -236,21 +247,18 @@ recyclerView.setAdapter(adapter);
                 });
     }
 
+    // 🔹 Select All toggle
     private void toggleSelectAll() {
         boolean allSelected = true;
-        for (Map<String, Object> sms : smsList) {
-            if (!(boolean) sms.get("selected")) {
-                allSelected = false;
-                break;
-            }
-        }
-        for (Map<String, Object> sms : smsList) {
+        for (Map<String, Object> sms : smsList)
+            if (!(boolean) sms.get("selected")) allSelected = false;
+        for (Map<String, Object> sms : smsList)
             sms.put("selected", !allSelected);
-        }
         adapter.notifyDataSetChanged();
         updateSelectedCount();
     }
 
+    // 🔹 Update selected count
     private void updateSelectedCount() {
         long count = smsList.stream().filter(s -> (boolean) s.get("selected")).count();
         smsCountText.setText("📩 " + count + " SMS selected");

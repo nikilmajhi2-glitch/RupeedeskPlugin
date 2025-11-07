@@ -1,4 +1,4 @@
-package com.rupeedesk.smsaautosender;
+package com.rupeedesk;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -6,11 +6,17 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Reusable RecyclerView adapter for displaying and selecting SMS items.
+ * Works with MainActivity (com.rupeedesk).
+ */
 public class SmsListAdapter extends RecyclerView.Adapter<SmsListAdapter.ViewHolder> {
 
     private final Context context;
@@ -41,14 +47,15 @@ public class SmsListAdapter extends RecyclerView.Adapter<SmsListAdapter.ViewHold
         String message = (String) sms.get("message");
         boolean selected = (boolean) sms.get("selected");
 
-        holder.phoneText.setText(phone);
-        holder.messageText.setText(message);
+        holder.phoneText.setText(phone != null ? phone : "Unknown");
+        holder.messageText.setText(message != null ? message : "(empty message)");
         holder.checkBox.setChecked(selected);
 
         View.OnClickListener toggle = v -> {
-            sms.put("selected", !selected);
+            boolean newState = !(boolean) sms.get("selected");
+            sms.put("selected", newState);
             notifyItemChanged(position);
-            listener.onSelectionChanged();
+            if (listener != null) listener.onSelectionChanged();
         };
 
         holder.itemView.setOnClickListener(toggle);
