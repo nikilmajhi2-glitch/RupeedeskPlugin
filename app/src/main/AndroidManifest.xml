@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 🔐 Permissions -->
+    <!-- ✅ Core permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
@@ -21,26 +21,38 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- 🧭 Main launcher activity -->
+        <!-- 🏁 Main launcher activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
+
+            <!-- Launcher intent -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- ✅ Required for SMS default app eligibility -->
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+            </intent-filter>
         </activity>
 
-        <!-- ⚙️ Foreground SMS service -->
+        <!-- ⚙️ SMS Sending Foreground Service -->
         <service
             android:name=".SmsService"
             android:exported="false"
             android:foregroundServiceType="dataSync|connectedDevice|phoneCall" />
 
-        <!-- 📩 Broadcast receiver for sent-status -->
-        <receiver android:name=".SmsSentReceiver" android:exported="false" />
+        <!-- 📩 Broadcast receiver for SMS sent-delivery status -->
+        <receiver
+            android:name=".SmsSentReceiver"
+            android:exported="false" />
 
-        <!-- 🔄 Boot auto-start -->
+        <!-- 🔁 Auto-start after reboot -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -50,7 +62,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- 📥 Receive incoming SMS when app is default -->
+        <!-- 📥 Receive incoming SMS (only works when default) -->
         <receiver
             android:name=".sms.SmsBroadcastReceiver"
             android:permission="android.permission.BROADCAST_SMS"
