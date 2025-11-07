@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
         userIdInput = findViewById(R.id.userIdInput);
         startButton = findViewById(R.id.startButton);
 
-        // Register the callback for RoleManager / Intent result
+        // Register callback for default SMS role request
         roleRequestLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -51,7 +51,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
 
-        // When Start Task button is clicked
         startButton.setOnClickListener(v -> {
             String userId = userIdInput.getText().toString().trim();
             if (userId.isEmpty()) {
@@ -62,17 +61,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * ✅ Verify user exists in Firestore before starting service
-     */
     private void verifyUserAndProceed(String userId) {
         db.collection("users").document(userId).get()
                 .addOnSuccessListener(snapshot -> {
                     if (snapshot.exists()) {
                         SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
                         prefs.edit().putString("userId", userId).apply();
-
-                        // Check default SMS role before starting
                         if (!isDefaultSmsApp()) {
                             requestMakeDefaultSmsApp();
                         } else {
@@ -85,18 +79,12 @@ public class MainActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-    /**
-     * ✅ Check if app is current default SMS handler
-     */
     private boolean isDefaultSmsApp() {
         String myPackage = getPackageName();
         String defaultSms = Telephony.Sms.getDefaultSmsPackage(this);
         return myPackage.equals(defaultSms);
     }
 
-    /**
-     * ✅ Redirect user to correct system screen to set as default SMS
-     */
     private void requestMakeDefaultSmsApp() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -104,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
                 if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_SMS)) {
                     Intent intent = rm.createRequestRoleIntent(RoleManager.ROLE_SMS);
                     roleRequestLauncher.launch(intent);
-                    Toast.makeText(this, "Please allow RupeeDesk as default SMS app", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Please select RupeeDesk as default SMS app", Toast.LENGTH_LONG).show();
                     return;
                 }
             }
@@ -116,13 +104,10 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Please set RupeeDesk as default SMS app", Toast.LENGTH_LONG).show();
 
         } catch (Exception e) {
-            Toast.makeText(this, "Unable to open default SMS settings: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Error opening default SMS dialog: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
-    /**
-     * ✅ Check and request runtime permissions
-     */
     private void checkPermissionsAndStartService() {
         String[] perms = {
                 Manifest.permission.SEND_SMS,
@@ -154,9 +139,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * ✅ Start background SMS service
-     */
     private void startSmsService() {
         try {
             Intent serviceIntent = new Intent(this, SmsService.class);
