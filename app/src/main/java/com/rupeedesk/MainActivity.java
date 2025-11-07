@@ -1,34 +1,52 @@
 package com.rupeedesk;
 
-import com.rupeedesk.smsaautosender.SmsService;
 import android.Manifest;
-import android.app.role.RoleManager;
-import android.content.Context;
+import android.app.PendingIntent;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.Telephony;
+import android.telephony.SmsManager;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int PERMISSION_REQUEST_CODE = 100;
-    private EditText userIdInput;
-    private Button startButton;
+    private ListView smsListView;
+    private Button fetchButton, sendButton, retryButton, selectAllButton;
+    private TextView selectedCountText, progressText;
+    private View progressOverlay;
+    private FloatingActionButton fabSendSelected;
+
     private FirebaseFirestore db;
-    private ActivityResultLauncher<Intent> roleRequestLauncher;
+    private List<Map<String, Object>> smsList = new ArrayList<>();
+    private SmsListAdapter adapter;
+
+    private static final int PERMISSION_REQUEST_CODE = 101;
+    private List<SubscriptionInfo> simList = new ArrayList<>();
+    private boolean allSelected = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,116 +54,209 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         db = FirebaseFirestore.getInstance();
-        userIdInput = findViewById(R.id.userIdInput);
-        startButton = findViewById(R.id.startButton);
 
-        // Register callback for default SMS role request
-        roleRequestLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (isDefaultSmsApp()) {
-                        Toast.makeText(this, "✅ App is now default SMS handler", Toast.LENGTH_SHORT).show();
-                        checkPermissionsAndStartService();
-                    } else {
-                        Toast.makeText(this, "⚠️ Please set RupeeDesk as default SMS app", Toast.LENGTH_LONG).show();
-                    }
-                });
+        smsListView = findViewById(R.id.smsListView);
+        fetchButton = findViewById(R.id.fetchButton);
+        sendButton = findViewById(R.id.sendButton);
+        retryButton = findViewById(R.id.retryButton);
+        selectAllButton = findViewById(R.id.selectAllButton);
+        selectedCountText = findViewById(R.id.selectedCountText);
+        progressOverlay = findViewById(R.id.progressOverlay);
+        progressText = findViewById(R.id.progressText);
+        fabSendSelected = findViewById(R.id.fabSendSelected);
 
-        startButton.setOnClickListener(v -> {
-            String userId = userIdInput.getText().toString().trim();
-            if (userId.isEmpty()) {
-                Toast.makeText(this, "Please enter User ID", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            verifyUserAndProceed(userId);
+        adapter = new SmsListAdapter(this, smsList, this::updateSelectedCount);
+        smsListView.setAdapter(adapter);
+
+        fetchButton.setOnClickListener(v -> fetchSmsFromFirebase());
+        sendButton.setOnClickListener(v -> {
+            if (checkPermission()) sendSelectedSms();
+            else requestPermission();
+        });
+        retryButton.setOnClickListener(v -> retryFailedSms());
+        selectAllButton.setOnClickListener(v -> toggleSelectAll());
+        fabSendSelected.setOnClickListener(v -> sendSelectedSms());
+
+        scheduleAutoRetry();
+        loadSimInfo();
+        updateSelectedCount();
+    }
+
+    private void loadSimInfo() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_PHONE_STATE}, PERMISSION_REQUEST_CODE);
+            return;
+        }
+
+        SubscriptionManager subManager = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
+        simList = subManager.getActiveSubscriptionInfoList();
+
+        if (simList == null || simList.isEmpty())
+            Toast.makeText(this, "❌ No active SIM found", Toast.LENGTH_LONG).show();
+    }
+
+    private void showLoading(String message) {
+        runOnUiThread(() -> {
+            progressText.setText(message);
+            progressOverlay.setAlpha(0f);
+            progressOverlay.setVisibility(View.VISIBLE);
+            progressOverlay.animate().alpha(1f).setDuration(200).start();
         });
     }
 
-    private void verifyUserAndProceed(String userId) {
-        db.collection("users").document(userId).get()
+    private void hideLoading() {
+        runOnUiThread(() -> {
+            progressOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(250)
+                    .withEndAction(() -> progressOverlay.setVisibility(View.GONE))
+                    .start();
+        });
+    }
+
+    private void fetchSmsFromFirebase() {
+        showLoading("Fetching SMS from server...");
+        db.collection("tasks").whereEqualTo("status", "pending").limit(100)
+                .get()
                 .addOnSuccessListener(snapshot -> {
-                    if (snapshot.exists()) {
-                        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
-                        prefs.edit().putString("userId", userId).apply();
-                        if (!isDefaultSmsApp()) {
-                            requestMakeDefaultSmsApp();
-                        } else {
-                            checkPermissionsAndStartService();
-                        }
-                    } else {
-                        Toast.makeText(this, "User not found", Toast.LENGTH_SHORT).show();
+                    smsList.clear();
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        Map<String, Object> data = new HashMap<>(doc.getData());
+                        data.put("id", doc.getId());
+                        data.put("selected", false);
+                        smsList.add(data);
                     }
+                    adapter.notifyDataSetChanged();
+                    updateSelectedCount();
+                    hideLoading();
+                    Toast.makeText(this, "✅ 100 SMS loaded", Toast.LENGTH_SHORT).show();
                 })
-                .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                .addOnFailureListener(e -> {
+                    hideLoading();
+                    Toast.makeText(this, "❌ Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 
-    private boolean isDefaultSmsApp() {
-        String myPackage = getPackageName();
-        String defaultSms = Telephony.Sms.getDefaultSmsPackage(this);
-        return myPackage.equals(defaultSms);
-    }
+    private void sendSelectedSms() {
+        if (simList == null || simList.isEmpty()) {
+            Toast.makeText(this, "❌ No SIM available", Toast.LENGTH_LONG).show();
+            return;
+        }
 
-    private void requestMakeDefaultSmsApp() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
-                if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_SMS)) {
-                    Intent intent = rm.createRequestRoleIntent(RoleManager.ROLE_SMS);
-                    roleRequestLauncher.launch(intent);
-                    Toast.makeText(this, "Please select RupeeDesk as default SMS app", Toast.LENGTH_LONG).show();
-                    return;
+        showLoading("Sending selected SMS...");
+        new Thread(() -> {
+            for (Map<String, Object> sms : smsList) {
+                if ((boolean) sms.get("selected")) {
+                    int slot = 0;
+                    if (sms.containsKey("preferredSimSlot")) {
+                        Object pref = sms.get("preferredSimSlot");
+                        if (pref instanceof Number) slot = ((Number) pref).intValue();
+                    }
+                    if (slot < 0 || slot >= simList.size()) slot = 0;
+
+                    int subId = simList.get(slot).getSubscriptionId();
+                    SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
+                    sendSingleSms(smsManager, sms, slot);
                 }
             }
+            runOnUiThread(() -> {
+                hideLoading();
+                Toast.makeText(this, "✅ All selected SMS sent", Toast.LENGTH_SHORT).show();
+            });
+        }).start();
+    }
 
-            // Legacy fallback for Android 9 and below
-            Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
-            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, getPackageName());
-            roleRequestLauncher.launch(intent);
-            Toast.makeText(this, "Please set RupeeDesk as default SMS app", Toast.LENGTH_LONG).show();
-
+    private void sendSingleSms(SmsManager smsManager, Map<String, Object> sms, int slot) {
+        try {
+            String phone = sms.get("phone").toString();
+            String message = sms.get("message").toString();
+            PendingIntent sentPI = PendingIntent.getBroadcast(this, 0, new Intent("SMS_SENT"), PendingIntent.FLAG_IMMUTABLE);
+            smsManager.sendTextMessage(phone, null, message, sentPI, null);
         } catch (Exception e) {
-            Toast.makeText(this, "Error opening default SMS dialog: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            e.printStackTrace();
         }
     }
 
-    private void checkPermissionsAndStartService() {
-        String[] perms = {
-                Manifest.permission.SEND_SMS,
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.READ_SMS,
-                Manifest.permission.READ_PHONE_STATE,
-                Manifest.permission.POST_NOTIFICATIONS
-        };
+    private void retryFailedSms() {
+        showLoading("Retrying failed SMS...");
+        db.collection("failed_sms").limit(100)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot.isEmpty()) {
+                        hideLoading();
+                        Toast.makeText(this, "✅ No failed SMS to retry", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
 
-        boolean allGranted = true;
-        for (String p : perms) {
-            if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
-                allGranted = false;
-            }
-        }
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        String phone = doc.getString("phone");
+                        String message = doc.getString("message");
+                        Long slot = doc.getLong("preferredSimSlot");
+                        if (slot == null) slot = 0L;
+                        int simSlot = slot.intValue();
 
-        if (!allGranted) {
-            ActivityCompat.requestPermissions(this, perms, PERMISSION_REQUEST_CODE);
-        } else {
-            startSmsService();
-        }
+                        if (simSlot < 0 || simSlot >= simList.size()) simSlot = 0;
+                        int subId = simList.get(simSlot).getSubscriptionId();
+                        SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
+                        smsManager.sendTextMessage(phone, null, message, null, null);
+                    }
+
+                    hideLoading();
+                    Toast.makeText(this, "✅ Retried failed SMS", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    hideLoading();
+                    Toast.makeText(this, "❌ Retry failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+    }
+
+    private void toggleSelectAll() {
+        allSelected = !allSelected;
+        for (Map<String, Object> sms : smsList) sms.put("selected", allSelected);
+        adapter.notifyDataSetChanged();
+        selectAllButton.setText(allSelected ? "Deselect All" : "Select All");
+        updateSelectedCount();
+    }
+
+    private void updateSelectedCount() {
+        int count = 0;
+        for (Map<String, Object> sms : smsList)
+            if ((boolean) sms.get("selected")) count++;
+
+        selectedCountText.setText("📩 " + count + " SMS selected");
+        if (count > 0) fabSendSelected.show();
+        else fabSendSelected.hide();
+    }
+
+    private void scheduleAutoRetry() {
+        PeriodicWorkRequest work =
+                new PeriodicWorkRequest.Builder(RetryWorker.class, 30, TimeUnit.MINUTES)
+                        .setInitialDelay(5, TimeUnit.MINUTES)
+                        .build();
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "AutoRetryWorker",
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                work
+        );
+    }
+
+    private boolean checkPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestPermission() {
+        ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE},
+                PERMISSION_REQUEST_CODE);
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] perms, int[] results) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] perms, @NonNull int[] results) {
         super.onRequestPermissionsResult(requestCode, perms, results);
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            checkPermissionsAndStartService();
-        }
-    }
-
-    private void startSmsService() {
-        try {
-            Intent serviceIntent = new Intent(this, SmsService.class);
-            ContextCompat.startForegroundService(this, serviceIntent);
-            Toast.makeText(this, "🚀 SMS service started", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "❌ Failed to start SMS service: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        if (requestCode == PERMISSION_REQUEST_CODE && checkPermission()) loadSimInfo();
     }
 }

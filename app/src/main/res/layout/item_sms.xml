@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/smsRowLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="10dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="?android:attr/selectableItemBackground">
+
+    <CheckBox
+        android:id="@+id/smsCheckbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:layout_gravity="center_vertical" />
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp">
+
+        <TextView
+            android:id="@+id/phoneText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Phone Number"
+            android:textStyle="bold"
+            android:textColor="#000"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/messageText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Message preview goes here"
+            android:textColor="#555"
+            android:textSize="14sp"
+            android:maxLines="3"
+            android:ellipsize="end" />
+    </LinearLayout>
+</LinearLayout>
