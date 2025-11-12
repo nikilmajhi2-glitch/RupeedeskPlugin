@@ -114,7 +114,7 @@ public class AutoSmsWorker extends Worker {
         try {
             latch.await();
         } catch (InterruptedException e) {
-            Thread.currentThread.interrupt();
+            Thread.currentThread().interrupt(); // FIXED: Added parentheses
             return Result.retry();
         }
 
@@ -202,6 +202,4 @@ public class AutoSmsWorker extends Worker {
             db.collection("sms_tasks").document(id).update(update);
         }
     }
-}
-
-
+    }
