@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.rupeedesk"> <!-- Make sure this matches your build.gradle 'namespace' -->
+    package="com.rupeedesk">
 
     <!-- 🔐 Core Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -13,9 +13,7 @@
 
     <!-- ⚙️ Foreground Service Permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Required for Android 13 (API 33)+ to show notifications from the service -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Required for Android 14 (API 34)+ for data sync services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Optional: Permissions for reading/receiving SMS -->
@@ -24,13 +22,12 @@
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
 
-
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar"> <!-- Make sure these resources exist -->
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
         <!-- 🧭 Main Launcher Activity -->
         <activity
@@ -63,18 +60,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- 📥 Receive incoming SMS (Unused in current logic, but kept from original file) -->
+        <!-- 📥 Receive incoming SMS -->
         <receiver
             android:name=".smsaautosender.sms.SmsBroadcastReceiver"
             android:permission="android.permission.BROADCAST_SMS"
             android:exported="true">
-            <intent-filter android:priority="2147483647"> <!-- High priority -->
+            <intent-filter android:priority="2147483647">
                 <action android:name="android.provider.Telephony.SMS_DELIVER" />
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </D:\Projects\SmsAutoSender\app\src\main\java\com\rupeedesk\smsaautosender\sms\SmsBroadcastReceiver.java
             </intent-filter>
         </receiver>
     </application>
 </manifest>
-
-
