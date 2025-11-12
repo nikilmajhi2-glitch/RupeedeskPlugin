@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 public class SmsService extends Service {
 
     private static final String CHANNEL_ID = "SmsServiceChannel";
-    private static final String WORK_TAG = "SmsAutoWorker";
+    public static final String WORK_TAG = "SmsAutoWorker"; // FIXED: Changed from private to public
     private static final String TAG = "SmsService";
 
     /**
@@ -47,7 +47,7 @@ public class SmsService extends Service {
         createNotificationChannel();
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("RupeeDesk SMS Service")
-                .setContentText("Actively processing background SMS tasks")
+                .setContentText("Actively processing SMS tasks")
                 .setSmallIcon(android.R.drawable.ic_dialog_info) // TODO: Replace with your app's icon
                 .setOngoing(true)
                 .build();
@@ -107,6 +107,4 @@ public class SmsService extends Service {
             }
         }
     }
-}
-
-
+    }
