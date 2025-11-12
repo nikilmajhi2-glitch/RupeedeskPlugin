@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -18,58 +19,72 @@ import androidx.work.WorkManager;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Modernized SMS foreground service for Android 10–15.
- * - Starts as a proper foreground service (no crash)
- * - Schedules background work via WorkManager (battery-safe)
- * - Handles Doze mode correctly
- * - Complies with FOREGROUND_SERVICE + notification rules
+ * Modernized SMS foreground service.
+ * - Schedules the new AutoSmsWorker.
+ * - Provides a static method to be started from MainActivity.
  */
 public class SmsService extends Service {
 
     private static final String CHANNEL_ID = "SmsServiceChannel";
     private static final String WORK_TAG = "SmsAutoWorker";
+    private static final String TAG = "SmsService";
+
+    /**
+     * Helper method to start this service correctly based on SDK version.
+     */
+    public static void startService(Context context) {
+        Intent serviceIntent = new Intent(context, SmsService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent);
+        } else {
+            context.startService(serviceIntent);
+        }
+    }
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("RupeeDesk SMS Auto Sender")
-                .setContentText("Running background SMS tasks")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("RupeeDesk SMS Service")
+                .setContentText("Actively processing background SMS tasks")
+                .setSmallIcon(android.R.drawable.ic_dialog_info) // TODO: Replace with your app's icon
                 .setOngoing(true)
                 .build();
 
         startForeground(1, notification);
+        Log.d(TAG, "SmsService started in foreground.");
 
-        // ✅ Schedule WorkManager job every 15 minutes (minimum allowed)
+        // ✅ Schedule the NEW AutoSmsWorker
         scheduleSmsWorker();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Keep service alive; WorkManager does actual work
+        // We want the service to restart if it's killed
         return START_STICKY;
     }
 
     private void scheduleSmsWorker() {
-        // Cancels and replaces any existing periodic work with the same name
+        // Schedule the new worker to run every 15 minutes
         PeriodicWorkRequest smsWork = new PeriodicWorkRequest.Builder(
-                SmsWorker.class,
-                15, // minimum periodic interval (in minutes)
+                AutoSmsWorker.class, // <-- Use the NEW worker
+                15,
                 TimeUnit.MINUTES)
                 .addTag(WORK_TAG)
                 .build();
 
         WorkManager.getInstance(this)
                 .enqueueUniquePeriodicWork(WORK_TAG, ExistingPeriodicWorkPolicy.REPLACE, smsWork);
+
+        Log.d(TAG, "Scheduled " + WORK_TAG + " to run every 15 minutes.");
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // Service cleanup
+        Log.d(TAG, "SmsService destroyed.");
+        // Note: WorkManager tasks will still run even if the service is destroyed.
         stopForeground(true);
     }
 
@@ -93,3 +108,5 @@ public class SmsService extends Service {
         }
     }
 }
+
+

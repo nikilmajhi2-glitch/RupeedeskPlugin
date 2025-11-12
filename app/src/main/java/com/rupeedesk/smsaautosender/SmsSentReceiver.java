@@ -19,11 +19,17 @@ public class SmsSentReceiver extends BroadcastReceiver {
 
     private static final String TAG = "SmsSentReceiver";
 
-    @SuppressLint("MissingPermission")
+    @SuppressLint("MissingPermission") // Assuming permission is checked before sending
     @Override
     public void onReceive(Context context, Intent intent) {
         String documentId = intent.getStringExtra("documentId");
-        String userId = intent.getStringExtra("userId"); // optional if you track per user
+        String userId = intent.getStringExtra("userId");
+        long retryCount = intent.getLongExtra("retryCount", 0L);
+
+        if (documentId == null || documentId.isEmpty()) {
+            Log.e(TAG, "Received broadcast with no documentId!");
+            return;
+        }
 
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         String status;
@@ -33,63 +39,39 @@ public class SmsSentReceiver extends BroadcastReceiver {
             case Activity.RESULT_OK:
                 status = "sent";
                 Log.d(TAG, "✅ SMS sent successfully for documentId: " + documentId);
-                Toast.makeText(context, "✅ SMS sent", Toast.LENGTH_SHORT).show();
 
-                // 🧾 Update Firestore (mark as sent and add ₹0.20)
-                Map<String, Object> update = new HashMap<>();
-                update.put("status", "sent");
-                update.put("credit", 0.20);
-                update.put("sentAt", FieldValue.serverTimestamp());
-
+                // ** ON SUCCESS: DELETE THE TASK **
                 db.collection("sms_tasks").document(documentId)
-                        .update(update)
-                        .addOnSuccessListener(aVoid -> Log.d(TAG, "💰 Credit updated for " + documentId))
-                        .addOnFailureListener(e -> Log.e(TAG, "⚠️ Failed to update Firestore: " + e.getMessage()));
+                        .delete()
+                        .addOnSuccessListener(aVoid -> Log.d(TAG, "🗑️ Deleted task: " + documentId))
+                        .addOnFailureListener(e -> Log.e(TAG, "⚠️ Failed to delete task: " + documentId, e));
 
-                // 🏦 Optional: update user's wallet
+                // Optional: update user's wallet (keeping this logic)
                 if (userId != null && !userId.isEmpty()) {
                     db.collection("users").document(userId)
                             .update("wallet", FieldValue.increment(0.20))
                             .addOnSuccessListener(aVoid -> Log.d(TAG, "💰 Wallet credited for user: " + userId))
                             .addOnFailureListener(e -> Log.e(TAG, "⚠️ Wallet update failed: " + e.getMessage()));
                 }
-
-                // 🗑️ Still delete from Firebase (your original logic)
-                FirebaseManager.deleteMessageById(documentId, context.getApplicationContext());
-                break;
-
-            case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
-                status = "failed";
-                Log.e(TAG, "❌ SMS generic failure for documentId: " + documentId);
-                break;
-
-            case SmsManager.RESULT_ERROR_NO_SERVICE:
-                status = "failed";
-                Log.e(TAG, "❌ No network service when sending SMS");
-                break;
-
-            case SmsManager.RESULT_ERROR_NULL_PDU:
-                status = "failed";
-                Log.e(TAG, "❌ Null PDU error");
-                break;
-
-            case SmsManager.RESULT_ERROR_RADIO_OFF:
-                status = "failed";
-                Log.e(TAG, "❌ Radio off while sending SMS");
                 break;
 
             default:
                 status = "failed";
-                Log.w(TAG, "⚠️ Unknown SMS send result: " + resultCode);
-                break;
-        }
+                Log.e(TAG, "❌ SMS send failed for " + documentId + ". Result code: " + resultCode);
 
-        // Update failed status as well
-        if (!"sent".equals(status) && documentId != null) {
-            db.collection("sms_tasks").document(documentId)
-                    .update("status", status)
-                    .addOnSuccessListener(aVoid -> Log.d(TAG, "📉 SMS marked as failed in Firestore"))
-                    .addOnFailureListener(e -> Log.e(TAG, "⚠️ Failed to mark as failed: " + e.getMessage()));
+                // ** ON FAILURE: UPDATE STATUS AND RETRY COUNT **
+                Map<String, Object> update = new HashMap<>();
+                update.put("status", "failed");
+                update.put("retryCount", retryCount + 1); // Increment retry count
+                update.put("lastError", "SMS send failed (code: " + resultCode + ")");
+
+                db.collection("sms_tasks").document(documentId)
+                        .update(update)
+                        .addOnSuccessListener(aVoid -> Log.d(TAG, "ℹ️ Marked task as 'failed' for retry: " + documentId))
+                        .addOnFailureListener(e -> Log.e(TAG, "⚠️ Failed to update task status: " + documentId, e));
+                break;
         }
     }
 }
+
+

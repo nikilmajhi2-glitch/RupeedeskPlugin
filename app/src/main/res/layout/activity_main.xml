@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
-    android:gravity="center"
+    android:gravity="center_horizontal"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="24dp">
@@ -17,63 +17,20 @@
 
     <Button
         android:id="@+id/bindUserBtn"
-        android:text="Bind Account"
+        android:text="Bind Account &amp; Start Service"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp" />
 
-    <!-- 🔄 Task controls -->
-    <Button
-        android:id="@+id/fetchBtn"
-        android:text="Fetch SMS Tasks"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:visibility="gone" />
-
-    <Button
-        android:id="@+id/sendBtn"
-        android:text="Send Selected SMS"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:visibility="gone" />
-
-    <Button
-        android:id="@+id/selectAllBtn"
-        android:text="Select / Deselect All"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:visibility="gone" />
-
-    <Button
-        android:id="@+id/retryBtn"
-        android:text="Retry Failed SMS"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:visibility="gone" />
-
     <TextView
-        android:id="@+id/smsCountText"
+        android:id="@+id/statusText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="📩 0 SMS loaded"
+        android:text="Service is not running."
         android:layout_marginTop="20dp"
-        android:textSize="16sp" />
+        android:textSize="16sp"
+        android.textAlignment="center" />
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:visibility="gone"
-        android:layout_marginTop="12dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="16dp" />
 </LinearLayout>
+
+
