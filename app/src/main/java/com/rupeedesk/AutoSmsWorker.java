@@ -16,7 +16,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The new "brains" of the app. This single worker runs periodically to:
@@ -143,5 +146,4 @@ public class AutoSmsWorker extends Worker {
             db.collection("sms_tasks").document(id).update(update);
         }
     }
-}
-
+    }
