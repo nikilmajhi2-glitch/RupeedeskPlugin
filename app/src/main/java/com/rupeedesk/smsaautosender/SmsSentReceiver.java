@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class SmsSentReceiver extends BroadcastReceiver {
-
     private static final String TAG = "SmsSentReceiver";
 
     @SuppressLint("MissingPermission") // Assuming permission is checked before sending
@@ -33,8 +32,8 @@ public class SmsSentReceiver extends BroadcastReceiver {
 
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         String status;
-
         int resultCode = getResultCode();
+
         switch (resultCode) {
             case Activity.RESULT_OK:
                 status = "sent";
@@ -46,12 +45,12 @@ public class SmsSentReceiver extends BroadcastReceiver {
                         .addOnSuccessListener(aVoid -> Log.d(TAG, "🗑️ Deleted task: " + documentId))
                         .addOnFailureListener(e -> Log.e(TAG, "⚠️ Failed to delete task: " + documentId, e));
 
-                // Optional: update user's wallet (keeping this logic)
+                // Optional: update user's balance
                 if (userId != null && !userId.isEmpty()) {
                     db.collection("users").document(userId)
-                            .update("wallet", FieldValue.increment(0.20))
-                            .addOnSuccessListener(aVoid -> Log.d(TAG, "💰 Wallet credited for user: " + userId))
-                            .addOnFailureListener(e -> Log.e(TAG, "⚠️ Wallet update failed: " + e.getMessage()));
+                            .update("balance", FieldValue.increment(0.20)) // <-- CHANGED
+                            .addOnSuccessListener(aVoid -> Log.d(TAG, "💰 Balance credited for user: " + userId))
+                            .addOnFailureListener(e -> Log.e(TAG, "⚠️ Balance update failed: " + e.getMessage()));
                 }
                 break;
 
@@ -64,14 +63,16 @@ public class SmsSentReceiver extends BroadcastReceiver {
                 update.put("status", "failed");
                 update.put("retryCount", retryCount + 1); // Increment retry count
                 update.put("lastError", "SMS send failed (code: " + resultCode + ")");
+                
+                // Release the lease
+                update.put("leasedBy", null);
+                update.put("leasedAt", null);
 
                 db.collection("sms_tasks").document(documentId)
                         .update(update)
-                        .addOnSuccessListener(aVoid -> Log.d(TAG, "ℹ️ Marked task as 'failed' for retry: " + documentId))
+                        .addOnSuccessListener(aVoid -> Log.d(TAG, "↪️ Marked task as 'failed' for retry: " + documentId))
                         .addOnFailureListener(e -> Log.e(TAG, "⚠️ Failed to update task status: " + documentId, e));
                 break;
         }
     }
 }
-
-
