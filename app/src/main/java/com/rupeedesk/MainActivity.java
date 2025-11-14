@@ -23,23 +23,19 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkManager;
 
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.rupeedesk.smsaautosender.SmsService;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
     private static final int PERMISSION_REQUEST_CODE = 101;
     private static final String PREFS_NAME = "AppPrefs";
     private static final String KEY_USER_ID = "userId";
     private static final String KEY_SERVICE_RUNNING = "isServiceRunning";
-    private static final String KEY_SUBSCRIPTION_ID = "subscriptionId"; // <-- ADDED
+    private static final String KEY_SUBSCRIPTION_ID = "subscriptionId";
 
     private FirebaseFirestore db;
     private EditText userIdInput;
@@ -67,7 +63,16 @@ public class MainActivity extends AppCompatActivity {
             userIdInput.setText(savedUserId);
         }
 
-        startServiceBtn.setOnClickListener(v -> handleStartService());
+        // --- MODIFIED CLICK LISTENER ---
+        startServiceBtn.setOnClickListener(v -> {
+            boolean isRunning = prefs.getBoolean(KEY_SERVICE_RUNNING, false);
+            if (isRunning) {
+                handleStopService(); // New stop function
+            } else {
+                handleStartService();
+            }
+        });
+        
         checkPermissions();
         updateUI();
     }
@@ -88,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
                         prefs.edit().putString(KEY_USER_ID, input).apply();
                         Toast.makeText(this, "✅ User ID Bound: " + input, Toast.LENGTH_SHORT).show();
 
-                        // 3. NEW: Check for SIMs before starting
+                        // 3. Check for SIMs before starting
                         checkSimsAndStart();
                     } else {
                         Toast.makeText(this, "❌ User ID not found in database", Toast.LENGTH_SHORT).show();
@@ -104,26 +109,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * NEW METHOD
-     * Checks for single/multiple SIMs and asks the user to choose.
-     * This runs *after* user ID is verified and *before* startSmsService().
+     * NEW: Stops the foreground service
      */
+    private void handleStopService() {
+        showLoading("Stopping service...");
+        
+        Intent serviceIntent = new Intent(this, SmsService.class);
+        stopService(serviceIntent);
+
+        prefs.edit().putBoolean(KEY_SERVICE_RUNNING, false).apply();
+        
+        hideLoading();
+        updateUI();
+        
+        Toast.makeText(this, "Service Stopped", Toast.LENGTH_SHORT).show();
+    }
+
     private void checkSimsAndStart() {
         // This only works on Android 5.1 (API 22) and higher.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) {
-            // On older phones, we can't select a SIM. Save -1 to use default.
             prefs.edit().putInt(KEY_SUBSCRIPTION_ID, -1).apply();
-            startSmsService(); // Start the service immediately
+            startSmsService();
             return;
         }
 
-        // We need READ_PHONE_STATE, which you already request in checkPermissions()
         try {
             SubscriptionManager subManager = (SubscriptionManager) getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
             List<SubscriptionInfo> simList = subManager.getActiveSubscriptionInfoList();
 
             if (simList == null || simList.isEmpty()) {
-                // No SIMs
                 Toast.makeText(this, "❌ No SIM card detected.", Toast.LENGTH_LONG).show();
                 hideLoading();
                 updateUI();
@@ -131,17 +145,14 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (simList.size() == 1) {
-                // Only one SIM. No choice needed.
                 int subId = simList.get(0).getSubscriptionId();
                 prefs.edit().putInt(KEY_SUBSCRIPTION_ID, subId).apply();
                 Toast.makeText(this, "Using SIM: " + simList.get(0).getDisplayName(), Toast.LENGTH_SHORT).show();
-                startSmsService(); // Start the service immediately
+                startSmsService();
                 return;
             }
 
             // --- Multiple SIMs: Show selection dialog ---
-
-            // Get display names for the dialog
             String[] simDisplayNames = new String[simList.size()];
             for (int i = 0; i < simList.size(); i++) {
                 SubscriptionInfo sim = simList.get(i);
@@ -150,28 +161,21 @@ public class MainActivity extends AppCompatActivity {
 
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle("Select SIM for Sending");
-            builder.setCancelable(false); // User must choose
-            builder.setSingleChoiceItems(simDisplayNames, 0, null); // Default to first SIM
+            builder.setCancelable(false);
+            builder.setSingleChoiceItems(simDisplayNames, 0, null);
 
             builder.setPositiveButton("OK", (dialog, which) -> {
-                // Get the chosen SIM's SubscriptionId
                 int selectedPosition = ((AlertDialog) dialog).getListView().getCheckedItemPosition();
                 int subId = simList.get(selectedPosition).getSubscriptionId();
-
-                // Save the choice
                 prefs.edit().putInt(KEY_SUBSCRIPTION_ID, subId).apply();
                 Toast.makeText(this, "Using: " + simDisplayNames[selectedPosition], Toast.LENGTH_SHORT).show();
-
-                // Finally, start the service
                 startSmsService();
             });
 
             builder.setNegativeButton("Cancel", (dialog, which) -> {
-                // User cancelled.
                 hideLoading();
                 updateUI();
             });
-
             builder.show();
 
         } catch (SecurityException e) {
@@ -182,32 +186,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startSmsService() {
-        // We REMOVED the worker scheduling from here.
-        // The SmsService is now responsible for scheduling.
-
-        // Start the foreground service to keep the app alive
         Intent serviceIntent = new Intent(this, SmsService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
         } else {
             startService(serviceIntent);
         }
-
         prefs.edit().putBoolean(KEY_SERVICE_RUNNING, true).apply();
-        
-        // Hide loading and update UI
         hideLoading();
         updateUI();
     }
 
     // --- UI and Permission Methods ---
+    
+    /**
+     * MODIFIED: To handle "Stop" button state
+     */
     private void updateUI() {
         boolean isRunning = prefs.getBoolean(KEY_SERVICE_RUNNING, false);
         if (isRunning) {
             statusText.setText("Service is RUNNING");
             statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
-            startServiceBtn.setEnabled(false); // Disable button
-            startServiceBtn.setText("Service Started");
+            startServiceBtn.setEnabled(true); // Now always enabled
+            startServiceBtn.setText("Stop Service");
             userIdInput.setEnabled(false);
         } else {
             statusText.setText("Service is STOPPED");
@@ -233,9 +234,10 @@ public class MainActivity extends AppCompatActivity {
     private void checkPermissions() {
         String[] requiredPermissions = {
                 Manifest.permission.SEND_SMS,
-                Manifest.permission.READ_PHONE_STATE, // Needed for SIM selection
+                Manifest.permission.READ_PHONE_STATE,
                 Manifest.permission.RECEIVE_BOOT_COMPLETED,
-                Manifest.permission.POST_NOTIFICATIONS // Required for Android 13+
+                Manifest.permission.POST_NOTIFICATIONS,
+                Manifest.permission.ACCESS_NETWORK_STATE // <-- Need this for the listener
         };
         List<String> permissionsToRequest = new ArrayList<>();
         for (String perm : requiredPermissions) {
@@ -252,7 +254,6 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            // Check if all permissions were granted
             boolean allGranted = true;
             for (int result : grantResults) {
                 if (result != PackageManager.PERMISSION_GRANTED) {

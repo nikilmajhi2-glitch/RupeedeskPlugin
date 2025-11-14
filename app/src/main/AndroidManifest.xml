@@ -2,21 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.rupeedesk">
 
-    <!-- 🔐 Core Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    
-    <!--  boot permission -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /> <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- ⚙️ Foreground Service Permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
-    <!-- Optional: Permissions for reading/receiving SMS -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.WRITE_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
@@ -27,9 +22,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        android.theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- 🧭 Main Launcher Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -39,18 +33,15 @@
             </intent-filter>
         </activity>
 
-        <!-- ⚙️ Background SMS Service -->
         <service
             android:name=".smsaautosender.SmsService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- 📩 Sent/Delivery receiver -->
-        <receiver 
-            android:name=".smsaautosender.SmsSentReceiver" 
+        <receiver
+            android:name=".smsaautosender.SmsSentReceiver"
             android:exported="false" />
 
-        <!-- 🔄 Boot auto-start -->
         <receiver
             android:name=".smsaautosender.BootReceiver"
             android:enabled="true"
@@ -60,7 +51,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- 📥 Receive incoming SMS -->
         <receiver
             android:name=".smsaautosender.sms.SmsBroadcastReceiver"
             android:permission="android.permission.BROADCAST_SMS"
@@ -68,7 +58,7 @@
             <intent-filter android:priority="2147483647">
                 <action android:name="android.provider.Telephony.SMS_DELIVER" />
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
+            </Zintent-filter>
         </receiver>
     </application>
 </manifest>
