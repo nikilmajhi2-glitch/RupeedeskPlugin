@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
+import android.util.Log; // Yeh import zaroori hai
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -176,7 +177,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startSmsService() {
-        Intent serviceIntent = new Intent(this, SmsService.class);
+        // Intent serviceIntent = new Intent(this, SmsService.class); // <-- Yeh line ab redundant hai
         SmsService.startService(this); // Aise call karna behtar hai
         
         prefs.edit().putBoolean(KEY_SERVICE_RUNNING, true).apply();
@@ -190,7 +191,9 @@ public class MainActivity extends AppCompatActivity {
             statusText.setText("Service is RUNNING");
             statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
             startServiceBtn.setEnabled(true);
-SmsService.java           startServiceBtn.setText("Stop Service");
+            // --- YEH THA FIX ---
+            startServiceBtn.setText("Stop Service");
+            // --- FIX END ---
             userIdInput.setEnabled(false);
         } else {
             statusText.setText("Service is STOPPED");
@@ -207,6 +210,7 @@ SmsService.java           startServiceBtn.setText("Stop Service");
         startServiceBtn.setEnabled(false);
     }
 
+SmsService.java
     private void hideLoading() {
         progressBar.setVisibility(View.GONE);
         updateUI();
