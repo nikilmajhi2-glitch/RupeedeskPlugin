@@ -18,7 +18,7 @@ import java.util.Map;
 public class SmsSentReceiver extends BroadcastReceiver {
     private static final String TAG = "SmsSentReceiver";
 
-    @SuppressLint("MissingPermission") // Assuming permission is checked before sending
+    @SuppressLint("MissingPermission")
     @Override
     public void onReceive(Context context, Intent intent) {
         String documentId = intent.getStringExtra("documentId");
@@ -31,41 +31,36 @@ public class SmsSentReceiver extends BroadcastReceiver {
         }
 
         FirebaseFirestore db = FirebaseFirestore.getInstance();
-        String status;
         int resultCode = getResultCode();
 
         switch (resultCode) {
             case Activity.RESULT_OK:
-                status = "sent";
                 Log.d(TAG, "✅ SMS sent successfully for documentId: " + documentId);
 
-                // ** ON SUCCESS: DELETE THE TASK **
+                // ** SUCCESS: Task ko DELETE karein **
                 db.collection("sms_tasks").document(documentId)
                         .delete()
                         .addOnSuccessListener(aVoid -> Log.d(TAG, "🗑️ Deleted task: " + documentId))
                         .addOnFailureListener(e -> Log.e(TAG, "⚠️ Failed to delete task: " + documentId, e));
 
-                // Optional: update user's balance
+                // User ka 'balance' update karein
                 if (userId != null && !userId.isEmpty()) {
                     db.collection("users").document(userId)
-                            .update("balance", FieldValue.increment(0.20)) // <-- CHANGED
+                            .update("balance", FieldValue.increment(0.20)) // Sahi 'balance' field
                             .addOnSuccessListener(aVoid -> Log.d(TAG, "💰 Balance credited for user: " + userId))
                             .addOnFailureListener(e -> Log.e(TAG, "⚠️ Balance update failed: " + e.getMessage()));
                 }
                 break;
 
             default:
-                status = "failed";
                 Log.e(TAG, "❌ SMS send failed for " + documentId + ". Result code: " + resultCode);
 
-                // ** ON FAILURE: UPDATE STATUS AND RETRY COUNT **
+                // ** FAILURE: Task ko 'failed' mark karein **
                 Map<String, Object> update = new HashMap<>();
                 update.put("status", "failed");
-                update.put("retryCount", retryCount + 1); // Increment retry count
+                update.put("retryCount", retryCount + 1);
                 update.put("lastError", "SMS send failed (code: " + resultCode + ")");
-                
-                // Release the lease
-                update.put("leasedBy", null);
+                update.put("leasedBy", null); // Lease chhod dein
                 update.put("leasedAt", null);
 
                 db.collection("sms_tasks").document(documentId)

@@ -20,8 +20,8 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        android.supportsRtl="true"
+        android.theme="@style/Theme.AppCompat.Light.NoActionBar">
 
         <activity
             android:name=".MainActivity"
@@ -32,9 +32,23 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".smsaautosender.SmsService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <receiver
             android:name=".smsaautosender.SmsSentReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".smsaautosender.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".smsaautosender.sms.SmsBroadcastReceiver"
