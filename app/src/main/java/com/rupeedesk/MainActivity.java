@@ -177,7 +177,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startSmsService() {
-        // Intent serviceIntent = new Intent(this, SmsService.class); // <-- Yeh line ab redundant hai
         SmsService.startService(this); // Aise call karna behtar hai
         
         prefs.edit().putBoolean(KEY_SERVICE_RUNNING, true).apply();
@@ -191,9 +190,7 @@ public class MainActivity extends AppCompatActivity {
             statusText.setText("Service is RUNNING");
             statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
             startServiceBtn.setEnabled(true);
-            // --- YEH THA FIX ---
             startServiceBtn.setText("Stop Service");
-            // --- FIX END ---
             userIdInput.setEnabled(false);
         } else {
             statusText.setText("Service is STOPPED");
@@ -210,11 +207,12 @@ public class MainActivity extends AppCompatActivity {
         startServiceBtn.setEnabled(false);
     }
 
-SmsService.java
+    // --- YEH THA FIX ---
     private void hideLoading() {
         progressBar.setVisibility(View.GONE);
         updateUI();
     }
+    // --- FIX END ---
 
     private void checkPermissions() {
         String[] requiredPermissions = {
