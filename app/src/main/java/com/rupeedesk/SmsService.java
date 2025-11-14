@@ -39,6 +39,7 @@ public class SmsService extends Service {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private String userId;
+    // private int subscriptionId; // <-- Hata diya gaya
     private ListenerRegistration firestoreListener;
 
     private NotificationManager notificationManager;
@@ -83,19 +84,19 @@ public class SmsService extends Service {
 
         SharedPreferences prefs = getApplicationContext().getSharedPreferences("AppPrefs", Context.MODE_PRIVATE);
         userId = prefs.getString("userId", null);
-        // int subscriptionId = prefs.getInt("subscriptionId", -1); // <-- Hum ab default hi istemaal karenge
+        // subscriptionId = prefs.getInt("subscriptionId", -1); // <-- Hata diya gaya
 
         if (userId == null || userId.isEmpty()) {
             String errorMsg = "Error: User ID not bound.";
             Log.e(TAG, errorMsg);
-            updateNotification(errorMsg); // Naya Error
+            updateNotification(errorMsg); 
             return;
         }
 
         if (!isNetworkAvailable()) {
             String errorMsg = "Error: No internet connection.";
             Log.e(TAG, errorMsg);
-            updateNotification(errorMsg); // Naya Error
+            updateNotification(errorMsg);
             return;
         }
 
@@ -109,11 +110,9 @@ public class SmsService extends Service {
 
         firestoreListener = query.addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                // --- NAYA ERROR UPDATE ---
                 String errorMsg = "Listen failed: " + error.getMessage();
                 Log.e(TAG, "🔥 " + errorMsg);
                 updateNotification(errorMsg);
-                // --- END ---
                 return;
             }
 
@@ -122,7 +121,7 @@ public class SmsService extends Service {
                 updateNotification("Processing " + snapshot.size() + " tasks...");
                 
                 for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                    leaseAndProcessTask(doc); 
+                    leaseAndProcessTask(doc); // <-- subId hata diya
                 }
             } else {
                 Log.d(TAG, "Queue is empty or snapshot was null.");
@@ -139,7 +138,7 @@ public class SmsService extends Service {
     }
 
 
-    private void leaseAndProcessTask(DocumentSnapshot doc) { 
+    private void leaseAndProcessTask(DocumentSnapshot doc) { // <-- subId hata diya
         String id = doc.getId();
         DocumentReference docRef = db.collection("sms_tasks").document(id);
 
@@ -164,18 +163,16 @@ public class SmsService extends Service {
             }
         }).addOnSuccessListener(snapshot -> {
             if (snapshot != null) {
-                sendSms(snapshot, userId); 
+                sendSms(snapshot, userId); // <-- subId hata diya
             }
         }).addOnFailureListener(e -> {
-            // --- NAYA ERROR UPDATE ---
             String errorMsg = "Lease failed: " + e.getMessage();
             Log.e(TAG, errorMsg);
             updateNotification(errorMsg);
-            // --- END ---
         });
     }
 
-    private void sendSms(DocumentSnapshot doc, String senderUserId) {
+    private void sendSms(DocumentSnapshot doc, String senderUserId) { // <-- subId hata diya
         String id = doc.getId();
         String phone = doc.getString("phone");
         String message = doc.getString("message");
@@ -199,18 +196,18 @@ public class SmsService extends Service {
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
             );
 
+            // --- YEH SABSE SIMPLE LOGIC HAI ---
             Log.d(TAG, "Using SmsManager.getDefault()...");
             SmsManager smsManager = SmsManager.getDefault();
+            // --- LOGIC END ---
             
             smsManager.sendTextMessage(phone, null, message, sentPI, null);
             Log.d(TAG, "📬 Sending SMS for leased task: " + id + " (Attempt #" + (retryCount + 1) + ")");
 
         } catch (Exception e) {
-            // --- YEH SABSE ZAROORI ERROR UPDATE HAI ---
             String errorMsg = "Send failed: " + e.getMessage();
             Log.e(TAG, "❌ " + errorMsg);
-            updateNotification(errorMsg); // ERROR AB NOTIFICATION MEIN DIKHEGA
-            // --- END ---
+            updateNotification(errorMsg); 
 
             Map<String, Object> update = new HashMap<>();
             update.put("status", "failed");

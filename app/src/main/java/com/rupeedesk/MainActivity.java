@@ -2,16 +2,15 @@ package com.rupeedesk;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.DialogInterface;
+// import android.content.DialogInterface; // Hata diya
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.telephony.SubscriptionInfo;
-import android.telephony.SubscriptionManager;
+// import android.telephony.SubscriptionInfo; // Hata diya
+// import android.telephony.SubscriptionManager; // Hata diya
 import android.text.TextUtils;
-import android.util.Log; // Yeh import zaroori hai
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -20,7 +19,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
+// import androidx.appcompat.app.AlertDialog; // Hata diya
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -36,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "AppPrefs";
     private static final String KEY_USER_ID = "userId";
     private static final String KEY_SERVICE_RUNNING = "isServiceRunning";
-    private static final String KEY_SUBSCRIPTION_ID = "subscriptionId";
+    // private static final String KEY_SUBSCRIPTION_ID = "subscriptionId"; // Hata diya
 
     private FirebaseFirestore db;
     private EditText userIdInput;
@@ -48,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main); // Yeh R.layout.activity_main istemaal karega
+        setContentView(R.layout.activity_main); 
         db = FirebaseFirestore.getInstance();
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
@@ -58,13 +57,11 @@ public class MainActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         statusText = findViewById(R.id.statusText);
 
-        // Load saved user ID
         String savedUserId = prefs.getString(KEY_USER_ID, null);
         if (savedUserId != null) {
             userIdInput.setText(savedUserId);
         }
 
-        // Click listener ab Start/Stop dono karega
         startServiceBtn.setOnClickListener(v -> {
             boolean isRunning = prefs.getBoolean(KEY_SERVICE_RUNNING, false);
             if (isRunning) {
@@ -91,7 +88,11 @@ public class MainActivity extends AppCompatActivity {
                     if (snapshot.exists()) {
                         prefs.edit().putString(KEY_USER_ID, input).apply();
                         Toast.makeText(this, "✅ User ID Bound: " + input, Toast.LENGTH_SHORT).show();
-                        checkSimsAndStart();
+                        
+                        // --- BADLAV YAHAN HAI ---
+                        // Ab hum seedha service start karenge
+                        startSmsService(); 
+                        // checkSimsAndStart() ko hata diya gaya hai
                     } else {
                         Toast.makeText(this, "❌ User ID not found", Toast.LENGTH_SHORT).show();
                         hideLoading();
@@ -119,65 +120,10 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "Service Stopped", Toast.LENGTH_SHORT).show();
     }
 
-    private void checkSimsAndStart() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) {
-            prefs.edit().putInt(KEY_SUBSCRIPTION_ID, -1).apply();
-            startSmsService(); // Seedha service start karein
-            return;
-        }
-
-        try {
-            SubscriptionManager subManager = (SubscriptionManager) getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
-            List<SubscriptionInfo> simList = subManager.getActiveSubscriptionInfoList();
-
-            if (simList == null || simList.isEmpty()) {
-                Toast.makeText(this, "❌ No SIM card detected.", Toast.LENGTH_LONG).show();
-                hideLoading();
-                updateUI();
-                return;
-            }
-
-            if (simList.size() == 1) {
-                int subId = simList.get(0).getSubscriptionId();
-                prefs.edit().putInt(KEY_SUBSCRIPTION_ID, subId).apply();
-                Toast.makeText(this, "Using SIM: " + simList.get(0).getDisplayName(), Toast.LENGTH_SHORT).show();
-                startSmsService();
-                return;
-            }
-
-            String[] simDisplayNames = new String[simList.size()];
-            for (int i = 0; i < simList.size(); i++) {
-                simDisplayNames[i] = "SIM " + (simList.get(i).getSimSlotIndex() + 1) + ": " + simList.get(i).getDisplayName();
-            }
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Select SIM for Sending");
-            builder.setCancelable(false);
-            builder.setSingleChoiceItems(simDisplayNames, 0, null);
-
-            builder.setPositiveButton("OK", (dialog, which) -> {
-                int selectedPosition = ((AlertDialog) dialog).getListView().getCheckedItemPosition();
-                int subId = simList.get(selectedPosition).getSubscriptionId();
-                prefs.edit().putInt(KEY_SUBSCRIPTION_ID, subId).apply();
-                Toast.makeText(this, "Using: " + simDisplayNames[selectedPosition], Toast.LENGTH_SHORT).show();
-                startSmsService();
-            });
-
-            builder.setNegativeButton("Cancel", (dialog, which) -> {
-                hideLoading();
-                updateUI();
-            });
-            builder.show();
-
-        } catch (SecurityException e) {
-            Toast.makeText(this, "Error: Please grant READ_PHONE_STATE permission.", Toast.LENGTH_LONG).show();
-            hideLoading();
-            updateUI();
-        }
-    }
+    // --- checkSimsAndStart() METHOD POORI TARAH HATA DIYA GAYA HAI ---
 
     private void startSmsService() {
-        SmsService.startService(this); // Aise call karna behtar hai
+        SmsService.startService(this); 
         
         prefs.edit().putBoolean(KEY_SERVICE_RUNNING, true).apply();
         hideLoading();
@@ -207,14 +153,13 @@ public class MainActivity extends AppCompatActivity {
         startServiceBtn.setEnabled(false);
     }
 
-    // --- YEH THA FIX ---
     private void hideLoading() {
         progressBar.setVisibility(View.GONE);
         updateUI();
     }
-    // --- FIX END ---
 
     private void checkPermissions() {
+        // READ_PHONE_STATE ab bhi zaroori hai (kuch phones mein SMSManager ke liye)
         String[] requiredPermissions = {
                 Manifest.permission.SEND_SMS,
                 Manifest.permission.READ_PHONE_STATE,
