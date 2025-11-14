@@ -25,7 +25,7 @@ import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.Transaction;
 import com.google.firebase.firestore.WriteBatch;
-import com.rupeedesk.R; // Yeh import zaroori hai
+import com.rupeedesk.R;
 
 import java.util.Arrays;
 import java.util.Date;
@@ -35,13 +35,14 @@ import java.util.Map;
 public class SmsService extends Service {
     private static final String CHANNEL_ID = "SmsServiceChannel";
     private static final String TAG = "SmsService";
+    private static final int NOTIFICATION_ID = 1;
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private String userId;
-    private int subscriptionId;
-
-    // Yeh hamara real-time listener hai
     private ListenerRegistration firestoreListener;
+
+    private NotificationManager notificationManager;
+    private NotificationCompat.Builder notificationBuilder;
 
     public static void startService(Context context) {
         Intent serviceIntent = new Intent(context, SmsService.class);
@@ -56,70 +57,80 @@ public class SmsService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+
+        notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("RupeeDesk SMS Service")
-                .setContentText("Actively listening for new tasks...") // Naya text
-                .setSmallIcon(R.mipmap.ic_launcher) // Aapka app icon
-                .setOngoing(true)
-                .build();
-        startForeground(1, notification);
+                .setContentText("Initializing service...")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setOngoing(true);
+
+        startForeground(NOTIFICATION_ID, notificationBuilder.build());
 
         Log.d(TAG, "SmsService started in foreground.");
-
-        // Real-time listener ko start karein
         startSmsListener();
     }
 
+    private void updateNotification(String text) {
+        notificationBuilder.setContentText(text);
+        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
+    }
+
     private void startSmsListener() {
-        // Purana listener (agar hai toh) band karein
         if (firestoreListener != null) {
             firestoreListener.remove();
         }
 
-        // User details load karein
         SharedPreferences prefs = getApplicationContext().getSharedPreferences("AppPrefs", Context.MODE_PRIVATE);
         userId = prefs.getString("userId", null);
-        subscriptionId = prefs.getInt("subscriptionId", -1);
+        // int subscriptionId = prefs.getInt("subscriptionId", -1); // <-- Hum ab default hi istemaal karenge
 
         if (userId == null || userId.isEmpty()) {
-            Log.e(TAG, "No UserID bound. Listener not started.");
+            String errorMsg = "Error: User ID not bound.";
+            Log.e(TAG, errorMsg);
+            updateNotification(errorMsg); // Naya Error
             return;
         }
 
         if (!isNetworkAvailable()) {
-            Log.e(TAG, "No network. Listener not started.");
+            String errorMsg = "Error: No internet connection.";
+            Log.e(TAG, errorMsg);
+            updateNotification(errorMsg); // Naya Error
             return;
         }
 
         Log.d(TAG, "Attaching Firestore Snapshot Listener...");
+        updateNotification("Actively listening for new tasks...");
 
-        // Yeh query ab index ki wajah se kaam karegi
         Query query = db.collection("sms_tasks")
                 .whereIn("status", Arrays.asList("pending", "failed"))
                 .orderBy("createdAt", Query.Direction.ASCENDING)
-                .limit(5); // Ek baar mein 5 task uthayega (SPAM se bachne ke liye)
+                .limit(5);
 
         firestoreListener = query.addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                Log.e(TAG, "🔥 Firestore Listen failed: ", error);
+                // --- NAYA ERROR UPDATE ---
+                String errorMsg = "Listen failed: " + error.getMessage();
+                Log.e(TAG, "🔥 " + errorMsg);
+                updateNotification(errorMsg);
+                // --- END ---
                 return;
             }
 
             if (snapshot != null && !snapshot.isEmpty()) {
                 Log.d(TAG, "✅ New tasks received. Processing " + snapshot.size() + " tasks...");
-
+                updateNotification("Processing " + snapshot.size() + " tasks...");
+                
                 for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                    leaseAndProcessTask(doc, subscriptionId);
+                    leaseAndProcessTask(doc); 
                 }
             } else {
                 Log.d(TAG, "Queue is empty or snapshot was null.");
+                updateNotification("Listening... Queue is empty.");
             }
         });
     }
 
-    /**
-     * Internet check karne ke liye helper method
-     */
     private boolean isNetworkAvailable() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (cm == null) return false;
@@ -128,9 +139,7 @@ public class SmsService extends Service {
     }
 
 
-    // --- Worker ke saare methods ab yahaan hain ---
-
-    private void leaseAndProcessTask(DocumentSnapshot doc, int subId) {
+    private void leaseAndProcessTask(DocumentSnapshot doc) { 
         String id = doc.getId();
         DocumentReference docRef = db.collection("sms_tasks").document(id);
 
@@ -146,7 +155,6 @@ public class SmsService extends Service {
                     transaction.delete(docRef);
                     return null;
                 }
-                // ** TASK KO LEASE KAREIN **
                 Log.d(TAG, "Leasing task: " + id);
                 transaction.update(docRef, "status", "sending", "leasedBy", userId, "leasedAt", new Date());
                 return snapshot;
@@ -156,15 +164,18 @@ public class SmsService extends Service {
             }
         }).addOnSuccessListener(snapshot -> {
             if (snapshot != null) {
-                // Task lease ho gaya, ab SMS bhej do
-                sendSms(snapshot, userId, subId);
+                sendSms(snapshot, userId); 
             }
         }).addOnFailureListener(e -> {
-            Log.e(TAG, "Failed to lease task " + id + ": " + e.getMessage());
+            // --- NAYA ERROR UPDATE ---
+            String errorMsg = "Lease failed: " + e.getMessage();
+            Log.e(TAG, errorMsg);
+            updateNotification(errorMsg);
+            // --- END ---
         });
     }
 
-    private void sendSms(DocumentSnapshot doc, String senderUserId, int subId) {
+    private void sendSms(DocumentSnapshot doc, String senderUserId) {
         String id = doc.getId();
         String phone = doc.getString("phone");
         String message = doc.getString("message");
@@ -188,20 +199,19 @@ public class SmsService extends Service {
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
             );
 
-            SmsManager smsManager;
-            if (subId != -1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-                Log.d(TAG, "Using specific Subscription ID: " + subId);
-                smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
-            } else {
-                Log.d(TAG, "Using default Subscription ID.");
-                smsManager = SmsManager.getDefault();
-            }
-
+            Log.d(TAG, "Using SmsManager.getDefault()...");
+            SmsManager smsManager = SmsManager.getDefault();
+            
             smsManager.sendTextMessage(phone, null, message, sentPI, null);
             Log.d(TAG, "📬 Sending SMS for leased task: " + id + " (Attempt #" + (retryCount + 1) + ")");
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to initiate send for task " + id + ": " + e.getMessage());
+            // --- YEH SABSE ZAROORI ERROR UPDATE HAI ---
+            String errorMsg = "Send failed: " + e.getMessage();
+            Log.e(TAG, "❌ " + errorMsg);
+            updateNotification(errorMsg); // ERROR AB NOTIFICATION MEIN DIKHEGA
+            // --- END ---
+
             Map<String, Object> update = new HashMap<>();
             update.put("status", "failed");
             update.put("retryCount", retryCount + 1);
@@ -214,7 +224,7 @@ public class SmsService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_STICKY; // Service ko zinda rakho
+        return START_STICKY; 
     }
 
     @Override
@@ -222,7 +232,6 @@ public class SmsService extends Service {
         super.onDestroy();
         Log.d(TAG, "SmsService destroyed. Detaching listener.");
 
-        // Listener ko band kar do
         if (firestoreListener != null) {
             firestoreListener.remove();
         }
@@ -243,7 +252,7 @@ public class SmsService extends Service {
                     "SMS Auto Sender Service",
                     NotificationManager.IMPORTANCE_LOW
             );
-            NotificationManager manager = getSystemService(NotificationManager.class);
+            NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
