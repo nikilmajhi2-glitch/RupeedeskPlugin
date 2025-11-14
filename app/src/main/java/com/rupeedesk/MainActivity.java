@@ -1,7 +1,7 @@
 package com.rupeedesk;
 
 import android.Manifest;
-import android.app.PendingIntent;
+import android.app.PendingIntent; // <-- ADDED
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -9,11 +9,11 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.telephony.SmsManager;
+import android.telephony.SmsManager; // <-- ADDED
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
-import android.util.Log;
+import android.util.Log; // <-- ADDED
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -32,13 +32,14 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.Transaction;
-import com.rupeedesk.smsaautosender.SmsSentReceiver; // We still use this
+import com.rupeedesk.smsaautosender.SmsSentReceiver;
 
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
+import java.util.Arrays; // <-- THIS WAS THE MISSING IMPORT
+import java.util.Date; // <-- ADDED
+import java.util.HashMap; // <-- ADDED
 import java.util.List;
-import java.util.Map;
+import java.util.Map; // <-- ADDED
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
