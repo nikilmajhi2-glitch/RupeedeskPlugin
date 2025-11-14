@@ -19,6 +19,9 @@ import androidx.work.OneTimeWorkRequest; // <-- CHANGED
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
+// ADDED THIS IMPORT FOR R.mipmap.ic_launcher
+import com.rupeedesk.R; 
+
 import java.util.concurrent.TimeUnit;
 
 public class SmsService extends Service {
@@ -53,7 +56,9 @@ public class SmsService extends Service {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("RupeeDesk SMS Service")
                 .setContentText("Actively processing SMS tasks")
-                .setSmallIcon(android.R.drawable.ic_dialog_info) // TODO: Replace with your app's icon
+                // --- THIS IS THE FIXED LINE ---
+                .setSmallIcon(R.mipmap.ic_launcher)
+                // --- END OF FIX ---
                 .setOngoing(true)
                 .build();
         startForeground(1, notification);
