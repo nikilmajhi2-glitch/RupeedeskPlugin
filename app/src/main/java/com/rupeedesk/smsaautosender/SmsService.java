@@ -8,8 +8,8 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.net.ConnectivityManager; // <-- ADDED
-import android.net.NetworkInfo; // <-- ADDED
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.IBinder;
 import android.telephony.SmsManager;
@@ -21,11 +21,15 @@ import androidx.core.app.NotificationCompat;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration; // <-- ADDED
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.Transaction;
 import com.google.firebase.firestore.WriteBatch;
+
+// --- THIS IS THE FIX ---
+// You must import the R file from your main package
 import com.rupeedesk.R;
+// --- END FIX ---
 
 import java.util.Arrays;
 import java.util.Date;
@@ -40,7 +44,6 @@ public class SmsService extends Service {
     private String userId;
     private int subscriptionId;
 
-    // --- NEW: This will hold our real-time listener ---
     private ListenerRegistration firestoreListener;
 
     public static void startService(Context context) {
@@ -58,28 +61,21 @@ public class SmsService extends Service {
         createNotificationChannel();
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("RupeeDesk SMS Service")
-                .setContentText("Actively listening for new tasks...") // Updated text
-                .setSmallIcon(R.mipmap.ic_launcher) // Your app icon
+                .setContentText("Actively listening for new tasks...")
+                .setSmallIcon(R.mipmap.ic_launcher) // This line will now work
                 .setOngoing(true)
                 .build();
         startForeground(1, notification);
 
         Log.d(TAG, "SmsService started in foreground.");
-
-        // --- REPLACED 24/7 LOOP WITH LISTENER ---
         startSmsListener();
     }
 
-    /**
-     * NEW: Attaches a real-time listener to Firestore.
-     */
     private void startSmsListener() {
-        // Stop any old listener
         if (firestoreListener != null) {
             firestoreListener.remove();
         }
 
-        // Get user details
         SharedPreferences prefs = getApplicationContext().getSharedPreferences("AppPrefs", Context.MODE_PRIVATE);
         userId = prefs.getString("userId", null);
         subscriptionId = prefs.getInt("subscriptionId", -1);
@@ -91,17 +87,15 @@ public class SmsService extends Service {
 
         if (!isNetworkAvailable()) {
             Log.e(TAG, "No network. Listener not started.");
-            // We should try again later, maybe with a handler
             return;
         }
 
         Log.d(TAG, "Attaching Firestore Snapshot Listener...");
 
-        // This query finds all tasks this phone can send (pending or failed)
         Query query = db.collection("sms_tasks")
                 .whereIn("status", Arrays.asList("pending", "failed"))
                 .orderBy("createdAt", Query.Direction.ASCENDING)
-                .limit(5); // Only grab 5 at a time
+                .limit(5); 
 
         firestoreListener = query.addSnapshotListener((snapshot, error) -> {
             if (error != null) {
@@ -110,11 +104,8 @@ public class SmsService extends Service {
             }
 
             if (snapshot != null && !snapshot.isEmpty()) {
-                Log.d(TAG, "✅ New tasks received from listener. Processing " + snapshot.size() + " tasks...");
-
-                // Process all new tasks immediately
+                Log.d(TAG, "✅ New tasks received. Processing " + snapshot.size() + " tasks...");
                 for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                    // Lease the task so we (and others) don't process it again
                     leaseAndProcessTask(doc, subscriptionId);
                 }
             } else {
@@ -123,9 +114,6 @@ public class SmsService extends Service {
         });
     }
 
-    /**
-     * Helper method to check for internet
-     */
     private boolean isNetworkAvailable() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (cm == null) return false;
@@ -133,8 +121,6 @@ public class SmsService extends Service {
         return activeNetwork != null && activeNetwork.isConnectedOrConnecting();
     }
 
-
-    // --- All worker methods are now part of the service ---
 
     private void leaseAndProcessTask(DocumentSnapshot doc, int subId) {
         String id = doc.getId();
@@ -144,7 +130,6 @@ public class SmsService extends Service {
             DocumentSnapshot snapshot = transaction.get(docRef);
             String status = snapshot.getString("status");
 
-            // We ONLY lease "pending" or "failed"
             if ("pending".equals(status) || "failed".equals(status)) {
                 Long retryCount = snapshot.getLong("retryCount");
                 if (retryCount == null) retryCount = 0L;
@@ -153,18 +138,15 @@ public class SmsService extends Service {
                     transaction.delete(docRef);
                     return null;
                 }
-                // ** LEASE THE TASK **
                 Log.d(TAG, "Leasing task: " + id);
                 transaction.update(docRef, "status", "sending", "leasedBy", userId, "leasedAt", new Date());
                 return snapshot;
             } else {
-                // Task was already leased by someone else or is already "sending"
                 Log.d(TAG, "Task " + id + " was already leased/sending. Skipping.");
                 return null;
             }
         }).addOnSuccessListener(snapshot -> {
             if (snapshot != null) {
-                // We successfully leased this task
                 sendSms(snapshot, userId, subId);
             }
         }).addOnFailureListener(e -> {
@@ -230,7 +212,6 @@ public class SmsService extends Service {
         super.onDestroy();
         Log.d(TAG, "SmsService destroyed. Detaching listener.");
 
-        // --- NEW: Stop the listener ---
         if (firestoreListener != null) {
             firestoreListener.remove();
         }
