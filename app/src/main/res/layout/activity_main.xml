@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:padding="24dp">
 
-    <!-- 🔑 Bind User ID -->
     <EditText
         android:id="@+id/userIdInput"
         android:hint="Enter your User ID"
@@ -15,18 +14,24 @@
         android:inputType="text"
         android:padding="12dp" />
 
-    <!-- 🚀 Start Button -->
     <Button
         android:id="@+id/startServiceBtn"
-        android:text="Bind &amp; Start Service"
+        android:text="Bind User ID"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:backgroundTint="#4CAF50"
         android:textColor="@android:color/white"/>
 
-    <!-- ℹ️ Status UI -->
-    <ProgressBar
+    <Button
+        android:id="@+id/sendTasksBtn"
+        android:text="Send All Tasks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#FF9800"
+        android:textColor="@android:color/white"
+        android:visibility="gone" /> <ProgressBar
         android:id="@+id/progressBar"
         android:visibility="gone"
         android:layout_marginTop="20dp"
@@ -42,5 +47,3 @@
         android:textSize="16sp" />
 
 </LinearLayout>
-
-
