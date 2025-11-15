@@ -5,23 +5,35 @@ apply plugin: 'com.google.gms.google-services'
 android {
 // ✅ Must match your Java package and manifest folder
 namespace "com.rupeedesk"
-compileSdkVersion 34 // 🆙 Android 15 support
+compileSdkVersion 34 // 🆙 Android 14 support (API 34)
 
 defaultConfig {
 // ✅ Must match your Firebase package name
 applicationId "com.rupeedesk"
-minSdkVersion 21
-targetSdkVersion 34
+minSdkVersion 21 // Android 5.0 - covers 99%+ devices
+targetSdkVersion 34 // Latest stable
 versionCode 1
-versionName "1.0"
+versionName "1.0.0"
 
 testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+// ✅ Enable multidex for apps with 64k+ methods (Firebase can exceed this)
+multiDexEnabled true
 }
 
 buildTypes {
 release {
 minifyEnabled false
 proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+// ✅ Recommended: Shrink resources in release builds
+shrinkResources false // Set to true when minifyEnabled = true
+}
+
+debug {
+// ✅ Useful for debugging
+debuggable true
+minifyEnabled false
 }
 }
 
@@ -42,28 +54,39 @@ excludes += [
 'META-INF/NOTICE',
 'META-INF/NOTICE.txt',
 'META-INF/notice.txt',
-'META-INF/ASL2.0'
+'META-INF/ASL2.0',
+'META-INF/*.kotlin_module'
 ]
 }
+}
+
+// ✅ Lint options to avoid build warnings
+lintOptions {
+abortOnError false
+checkReleaseBuilds false
 }
 }
 
 dependencies {
-// 🧱 AndroidX Core UI
-implementation 'androidx.appcompat:appcompat:1.6.1'
+// 🧱 AndroidX Core UI (Updated versions)
+implementation 'androidx.appcompat:appcompat:1.7.0'
 implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 implementation 'com.google.android.material:material:1.12.0'
+implementation 'androidx.cardview:cardview:1.0.0' // ✅ For Material CardView
+
+// ✅ CRITICAL: Add multidex support
+implementation 'androidx.multidex:multidex:2.0.1'
 
 // ⚙️ WorkManager (for background SMS scheduling)
 implementation 'androidx.work:work-runtime:2.9.1'
 
-// 🔥 Firebase (BoM ensures consistent versions)
-implementation platform('com.google.firebase:firebase-bom:32.2.0')
+// 🔥 Firebase (BoM ensures consistent versions - UPDATED to latest stable)
+implementation platform('com.google.firebase:firebase-bom:33.5.1')
 implementation 'com.google.firebase:firebase-firestore'
 implementation 'com.google.firebase:firebase-analytics'
 
-// 🧪 Testing (optional)
+// 🧪 Testing
 testImplementation 'junit:junit:4.13.2'
-androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 }

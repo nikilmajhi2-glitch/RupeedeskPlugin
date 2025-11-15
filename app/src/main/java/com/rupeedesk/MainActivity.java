@@ -6,12 +6,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -21,6 +20,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.rupeedesk.smsaautosender.SmsService;
 
@@ -35,10 +36,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SERVICE_RUNNING = "isServiceRunning";
 
     private FirebaseFirestore db;
-    private EditText userIdInput;
-    private Button startServiceBtn;
+    private TextInputEditText userIdInput;
+    private MaterialButton startServiceBtn;
     private ProgressBar progressBar;
     private TextView statusText;
+    private View statusIndicator;
     private SharedPreferences prefs;
 
     @Override
@@ -54,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
         startServiceBtn = findViewById(R.id.startServiceBtn);
         progressBar = findViewById(R.id.progressBar);
         statusText = findViewById(R.id.statusText);
+        statusIndicator = findViewById(R.id.statusIndicator);
 
         String savedUserId = prefs.getString(KEY_USER_ID, null);
         if (savedUserId != null) {
@@ -121,6 +124,7 @@ public class MainActivity extends AppCompatActivity {
         String input = userIdInput.getText().toString().trim();
         if (input.isEmpty()) {
             Toast.makeText(this, "Please enter your User ID", Toast.LENGTH_SHORT).show();
+            userIdInput.setError("User ID is required");
             return;
         }
 
@@ -145,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         Toast.makeText(this, "❌ User ID not found in database", Toast.LENGTH_SHORT).show();
                         Log.e(TAG, "User ID not found: " + input);
+                        userIdInput.setError("Invalid User ID");
                         hideLoading();
                     }
                 })
@@ -217,28 +222,67 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Enhanced: Update UI with Material Design components and status indicators
+     */
     private void updateUI() {
         // Use actual service state, not just SharedPreferences
         boolean isRunning = isServiceActuallyRunning(SmsService.class);
         boolean hasPermissions = hasAllPermissions();
         
         if (isRunning) {
-            statusText.setText("✅ Service is RUNNING");
+            // Service running - green status
+            statusText.setText("Service is RUNNING");
             statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
+            
+            // Update status indicator to green
+            if (statusIndicator != null) {
+                statusIndicator.setBackgroundResource(R.drawable.status_indicator_green);
+            }
+            
+            // Update button appearance for "Stop"
             startServiceBtn.setEnabled(true);
             startServiceBtn.setText("Stop Service");
+            startServiceBtn.setBackgroundTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, android.R.color.holo_red_dark)));
+            startServiceBtn.setIcon(ContextCompat.getDrawable(this, android.R.drawable.ic_media_pause));
+            
+            // Disable input when service is running
             userIdInput.setEnabled(false);
+            
         } else {
             if (!hasPermissions) {
-                statusText.setText("⚠️ Permissions Required");
+                // Missing permissions - orange status
+                statusText.setText("Permissions Required");
                 statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_orange_dark));
+                
+                // Update status indicator to orange
+                if (statusIndicator != null) {
+                    statusIndicator.setBackgroundResource(R.drawable.status_indicator_orange);
+                }
+                
                 startServiceBtn.setEnabled(false);
+                
             } else {
-                statusText.setText("⭕ Service is STOPPED");
+                // Service stopped - red status
+                statusText.setText("Service is STOPPED");
                 statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                
+                // Update status indicator to red
+                if (statusIndicator != null) {
+                    statusIndicator.setBackgroundResource(R.drawable.status_indicator_red);
+                }
+                
                 startServiceBtn.setEnabled(true);
             }
+            
+            // Update button appearance for "Start"
             startServiceBtn.setText("Bind & Start Service");
+            startServiceBtn.setBackgroundTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, android.R.color.holo_green_dark)));
+            startServiceBtn.setIcon(ContextCompat.getDrawable(this, android.R.drawable.ic_media_play));
+            
+            // Enable input when service is stopped
             userIdInput.setEnabled(true);
         }
     }
@@ -246,7 +290,9 @@ public class MainActivity extends AppCompatActivity {
     private void showLoading(String msg) {
         progressBar.setVisibility(View.VISIBLE);
         statusText.setText(msg);
+        statusText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         startServiceBtn.setEnabled(false);
+        userIdInput.setEnabled(false);
     }
 
     private void hideLoading() {
