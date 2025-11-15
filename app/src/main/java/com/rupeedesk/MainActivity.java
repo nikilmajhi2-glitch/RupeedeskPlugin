@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.rupeedesk.smsaautosender.SmsService;
 
@@ -48,6 +49,15 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
+        // ✅ CRITICAL: Initialize Firebase FIRST before using Firestore
+        try {
+            FirebaseApp.initializeApp(this);
+            Log.d(TAG, "✅ Firebase initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "⚠️ Firebase initialization error: " + e.getMessage(), e);
+        }
+        
+        // ✅ NOW safe to get Firestore instance
         db = FirebaseFirestore.getInstance();
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
