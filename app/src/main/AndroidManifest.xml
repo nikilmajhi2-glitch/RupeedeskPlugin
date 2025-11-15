@@ -2,87 +2,99 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Internet & Network -->
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-<!-- SMS Permissions -->
-<uses-permission android:name="android.permission.SEND_SMS" />
-<uses-permission android:name="android.permission.RECEIVE_SMS" />
-<uses-permission android:name="android.permission.READ_SMS" />
-<uses-permission android:name="android.permission.WRITE_SMS" />
-<uses-permission android:name="android.permission.RECEIVE_MMS" />
-<uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
+    <!-- SMS Permissions -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.WRITE_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_MMS" />
+    <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
 
-<!-- Phone State (needed for dual-SIM handling) -->
-<uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- Phone State (needed for dual-SIM handling) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
-<!-- Boot & Service -->
-<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Boot & Service -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- Wake Lock (recommended for reliable service operation) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-<application
-    android:allowBackup="true"
-    android:icon="@mipmap/ic_launcher"
-    android:label="@string/app_name"
-    android:supportsRtl="true"
-    android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-    <activity
-        android:name=".MainActivity"
-        android:exported="true"
-        android:launchMode="singleTop">
-        <intent-filter>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent-filter>
-    </activity>
+        <!-- Main Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
-    <!-- Fixed: Changed foregroundServiceType to specialUse for SMS operations -->
-    <service
-        android:name=".smsaautosender.SmsService"
-        android:exported="false"
-        android:foregroundServiceType="specialUse">
-        <property
-            android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-            android:value="sms_forwarding" />
-    </service>
+        <!-- SMS Foreground Service with specialUse type for Android 14+ -->
+        <service
+            android:name=".smsaautosender.SmsService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <!-- Required property for Android 14+ special use foreground service -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Automated SMS sending service for business communication and task processing" />
+        </service>
 
-    <!-- Fixed: Added explicit intent filter and priority -->
-    <receiver
-        android:name=".smsaautosender.SmsSentReceiver"
-        android:exported="true"
-        android:enabled="true">
-        <intent-filter android:priority="999">
-            <action android:name="com.rupeedesk.SMS_SENT" />
-        </intent-filter>
-    </receiver>
+        <!-- SMS Sent Result Receiver (INTERNAL USE ONLY - NOT EXPORTED) -->
+        <!-- This receiver handles SMS send results from SmsManager -->
+        <receiver
+            android:name=".smsaautosender.SmsSentReceiver"
+            android:exported="false"
+            android:enabled="true">
+            <!-- Custom action for SMS sent broadcasts -->
+            <intent-filter android:priority="999">
+                <action android:name="com.rupeedesk.SMS_SENT" />
+            </intent-filter>
+        </receiver>
 
-    <!-- Fixed: Added proper priority -->
-    <receiver
-        android:name=".smsaautosender.BootReceiver"
-        android:enabled="true"
-        android:exported="true"
-        android:directBootAware="true">
-        <intent-filter android:priority="999">
-            <action android:name="android.intent.action.BOOT_COMPLETED" />
-            <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-            <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-        </intent-filter>
-    </receiver>
+        <!-- Boot Receiver - Starts service on device boot -->
+        <receiver
+            android:name=".smsaautosender.BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
+            <!-- Multiple boot actions for compatibility across manufacturers -->
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
-    <!-- Fixed: Proper SMS receiver configuration -->
-    <receiver
-        android:name=".smsaautosender.sms.SmsBroadcastReceiver"
-        android:permission="android.permission.BROADCAST_SMS"
-        android:exported="true"
-        android:enabled="true">
-        <intent-filter android:priority="2147483647">
-            <action android:name="android.provider.Telephony.SMS_DELIVER" />
-            <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-        </intent-filter>
-    </receiver> 
+        <!-- SMS Incoming Receiver - Listens for incoming SMS -->
+        <!-- Must be exported to receive system broadcasts -->
+        <receiver
+            android:name=".smsaautosender.sms.SmsBroadcastReceiver"
+            android:permission="android.permission.BROADCAST_SMS"
+            android:exported="true"
+            android:enabled="true">
+            <!-- Highest priority to receive SMS before other apps -->
+            <intent-filter android:priority="2147483647">
+                <!-- SMS_DELIVER for default SMS app (Android 4.4+) -->
+                <action android:name="android.provider.Telephony.SMS_DELIVER" />
+                <!-- SMS_RECEIVED for older versions and non-default apps -->
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver> 
 
-</application> 
+    </application> 
 </manifest>
