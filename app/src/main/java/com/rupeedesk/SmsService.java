@@ -25,7 +25,6 @@ import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
-import com.google.firebase.FirebaseApp;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -49,8 +48,7 @@ public class SmsService extends Service {
     private static final long NETWORK_RETRY_DELAY_MS = 30000; // 30 seconds
     private static final long LISTENER_KEEPALIVE_MS = 300000; // 5 minutes
 
-    // ✅ Don't initialize here - will be initialized in onCreate()
-    private FirebaseFirestore db;
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private String userId;
     private ListenerRegistration firestoreListener;
     private NotificationManager notificationManager;
@@ -84,17 +82,6 @@ public class SmsService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "🚀 SmsService onCreate()");
-        
-        // ✅ CRITICAL: Initialize Firebase in service
-        try {
-            FirebaseApp.initializeApp(this);
-            db = FirebaseFirestore.getInstance();
-            Log.d(TAG, "✅ Firebase initialized in SmsService");
-        } catch (Exception e) {
-            Log.e(TAG, "⚠️ Firebase init failed in service: " + e.getMessage(), e);
-            // Try to get instance anyway (might already be initialized)
-            db = FirebaseFirestore.getInstance();
-        }
         
         networkRetryHandler = new Handler(Looper.getMainLooper());
         keepAliveHandler = new Handler(Looper.getMainLooper());
