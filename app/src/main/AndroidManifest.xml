@@ -1,32 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet & Network -->
+    <!-- All your permissions stay the same... -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- SMS Permissions -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.WRITE_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
-
-    <!-- Phone State (needed for dual-SIM handling) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-
-    <!-- Boot & Service -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- Wake Lock (recommended for reliable service operation) -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
-        android:name=".MyApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -44,36 +35,32 @@
             </intent-filter>
         </activity>
 
-        <!-- SMS Foreground Service with specialUse type for Android 14+ -->
+        <!-- SMS Foreground Service -->
         <service
             android:name=".smsaautosender.SmsService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
-            <!-- Required property for Android 14+ special use foreground service -->
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Automated SMS sending service for business communication and task processing" />
         </service>
 
-        <!-- SMS Sent Result Receiver (INTERNAL USE ONLY - NOT EXPORTED) -->
-        <!-- This receiver handles SMS send results from SmsManager -->
+        <!-- SMS Sent Result Receiver -->
         <receiver
             android:name=".smsaautosender.SmsSentReceiver"
             android:exported="false"
             android:enabled="true">
-            <!-- Custom action for SMS sent broadcasts -->
             <intent-filter android:priority="999">
                 <action android:name="com.rupeedesk.SMS_SENT" />
             </intent-filter>
         </receiver>
 
-        <!-- Boot Receiver - Starts service on device boot -->
+        <!-- Boot Receiver -->
         <receiver
             android:name=".smsaautosender.BootReceiver"
             android:enabled="true"
             android:exported="true"
             android:directBootAware="true">
-            <!-- Multiple boot actions for compatibility across manufacturers -->
             <intent-filter android:priority="999">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
@@ -81,18 +68,14 @@
             </intent-filter>
         </receiver>
 
-        <!-- SMS Incoming Receiver - Listens for incoming SMS -->
-        <!-- Must be exported to receive system broadcasts -->
+        <!-- SMS Incoming Receiver -->
         <receiver
             android:name=".smsaautosender.sms.SmsBroadcastReceiver"
             android:permission="android.permission.BROADCAST_SMS"
             android:exported="true"
             android:enabled="true">
-            <!-- Highest priority to receive SMS before other apps -->
             <intent-filter android:priority="2147483647">
-                <!-- SMS_DELIVER for default SMS app (Android 4.4+) -->
                 <action android:name="android.provider.Telephony.SMS_DELIVER" />
-                <!-- SMS_RECEIVED for older versions and non-default apps -->
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver> 
